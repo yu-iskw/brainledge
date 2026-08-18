@@ -20,7 +20,7 @@ describe('sqlite knowledge path', () => {
     const dataDir = mkdtempSync(path.join(os.tmpdir(), 'brainledge-kg-'));
     const handle = openStandalone(dataDir);
     try {
-      await handle.application.memory.remember(localContext(), {
+      const remembered = await handle.application.memory.remember(localContext(), {
         spaceId: LOCAL_SPACE_ID,
         content: 'Alice moved to Tokyo in July 2026.',
       });
@@ -32,6 +32,17 @@ describe('sqlite knowledge path', () => {
         spaceId: LOCAL_SPACE_ID,
       });
       expect(facts?.[0]?.predicate.id).toBe('livesIn');
+      await handle.application.memory.forget(localContext(), {
+        spaceId: LOCAL_SPACE_ID,
+        memoryId: remembered.episodeId,
+        mode: 'hide',
+      });
+      const hiddenFacts = await handle.application.knowledge?.queryFacts(localContext(), {
+        spaceId: LOCAL_SPACE_ID,
+      });
+      expect(hiddenFacts?.every((fact) => fact.sourceEpisodeId !== remembered.episodeId)).toBe(
+        true,
+      );
       const leaked = await handle.application.ports.episodes.findById({
         workspaceId: 'ws_other' as never,
         episodeId: 'missing' as never,

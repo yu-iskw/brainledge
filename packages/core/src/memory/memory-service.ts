@@ -10,6 +10,7 @@ import type { ForgetInput, RecallInput, RecallResult, RememberInput } from './ty
 import type { Authorizer, ExecutionContext } from '../auth/authorizer.js';
 import type { EpisodeKind } from '../knowledge/episode.js';
 import type { KnowledgeService } from '../knowledge/knowledge-service.js';
+import type { EmbeddingProvider } from '../models/providers.js';
 import type { Clock } from '../ports/clock.js';
 import type { EmbeddingStore } from '../ports/embedding-store.js';
 import type { EpisodeRepository } from '../ports/episode-repository.js';
@@ -36,6 +37,7 @@ export function createMemoryService(deps: {
   facts?: FactRepository;
   knowledge?: KnowledgeService;
   embeddings?: EmbeddingStore;
+  embeddingProvider?: EmbeddingProvider;
 }): MemoryService {
   return {
     async remember(context, input) {
@@ -71,6 +73,22 @@ export function createMemoryService(deps: {
         await deps.episodes.insert({ workspaceId: context.workspaceId, episode });
         await deps.evidence.insert({ workspaceId: context.workspaceId, evidence });
       });
+      if (deps.embeddingProvider !== undefined && deps.embeddings !== undefined) {
+        const embedded = await deps.embeddingProvider.embed({ texts: [input.content] });
+        for (const vector of embedded.vectors.slice(0, 1)) {
+          await deps.embeddings.upsert({
+            workspaceId: context.workspaceId,
+            embedding: {
+              id: `emb_${episodeId}`,
+              workspaceId: context.workspaceId,
+              targetType: 'episode',
+              targetId: episodeId,
+              model: embedded.model,
+              vector,
+            },
+          });
+        }
+      }
       return { episodeId };
     },
 
@@ -137,17 +155,39 @@ export function createMemoryService(deps: {
     async forget(context, input) {
       await authorizeOrThrow(deps.authorizer, context, 'memory.forget', 'space', input.spaceId);
       const episodeId = asEpisodeId(input.memoryId);
+      const retractLinkedFacts = async (): Promise<void> => {
+        if (deps.facts === undefined) {
+          return;
+        }
+        const facts = await deps.facts.query({
+          workspaceId: context.workspaceId,
+          knowledgeSpaceId: asKnowledgeSpaceId(input.spaceId),
+          limit: 500,
+        });
+        const now = deps.clock.now();
+        for (const fact of facts) {
+          if (fact.sourceEpisodeId === episodeId && fact.retractedAt === undefined) {
+            await deps.facts.upsert({
+              workspaceId: context.workspaceId,
+              fact: { ...fact, retractedAt: now, status: 'retracted' },
+            });
+          }
+        }
+      };
       switch (input.mode) {
         case 'hide': {
           await deps.episodes.hide({ workspaceId: context.workspaceId, episodeId });
+          await retractLinkedFacts();
           return;
         }
         case 'delete': {
           await deps.episodes.delete({ workspaceId: context.workspaceId, episodeId });
+          await retractLinkedFacts();
           return;
         }
         case 'purge': {
           await deps.episodes.delete({ workspaceId: context.workspaceId, episodeId });
+          await retractLinkedFacts();
           await deps.embeddings?.deleteByTarget({
             workspaceId: context.workspaceId,
             targetType: 'episode',
@@ -157,22 +197,7 @@ export function createMemoryService(deps: {
         }
         case 'retract': {
           await deps.episodes.hide({ workspaceId: context.workspaceId, episodeId });
-          const facts = deps.facts
-            ? await deps.facts.query({
-                workspaceId: context.workspaceId,
-                knowledgeSpaceId: asKnowledgeSpaceId(input.spaceId),
-                limit: 500,
-              })
-            : [];
-          const now = deps.clock.now();
-          for (const fact of facts) {
-            if (fact.retractedAt === undefined) {
-              await deps.facts?.upsert({
-                workspaceId: context.workspaceId,
-                fact: { ...fact, retractedAt: now, status: 'retracted' },
-              });
-            }
-          }
+          await retractLinkedFacts();
           return;
         }
         default: {

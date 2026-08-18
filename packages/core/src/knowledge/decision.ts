@@ -1,7 +1,7 @@
 import type { DecisionId, KnowledgeSpaceId, WorkspaceId } from '../domain/ids.js';
 import type { IsoUtcTimestamp } from '../domain/time.js';
 
-interface ContextSnapshot {
+export interface ContextSnapshot {
   readonly workspaceId: WorkspaceId;
   readonly knowledgeSpaceId: KnowledgeSpaceId;
   readonly episodeIds: readonly string[];
@@ -9,7 +9,7 @@ interface ContextSnapshot {
   readonly capturedAt: IsoUtcTimestamp;
 }
 
-interface DecisionRecord {
+export interface DecisionRecord {
   readonly id: DecisionId;
   readonly workspaceId: WorkspaceId;
   readonly knowledgeSpaceId: KnowledgeSpaceId;
@@ -17,6 +17,7 @@ interface DecisionRecord {
   readonly rationale: string;
   readonly snapshot: ContextSnapshot;
   readonly createdAt: IsoUtcTimestamp;
+  readonly status: 'proposed' | 'approved' | 'executed' | 'rejected';
 }
 
 export function createDecision(input: DecisionRecord): DecisionRecord {

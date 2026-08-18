@@ -4,39 +4,239 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Brainledge</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --border: color-mix(in srgb, CanvasText 20%, transparent);
+        --muted: color-mix(in srgb, CanvasText 65%, transparent);
+        --surface: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        line-height: 1.5;
+        margin: 0 auto;
+        max-width: 56rem;
+        padding: 1.5rem;
+      }
+      h1 {
+        margin-top: 0;
+      }
+      nav ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+        list-style: none;
+        margin: 0 0 1.5rem;
+        padding: 0;
+      }
+      section {
+        border-top: 1px solid var(--border);
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+      }
+      textarea,
+      input[type='search'],
+      input[type='text'],
+      input[type='url'] {
+        box-sizing: border-box;
+        width: 100%;
+      }
+      textarea {
+        min-height: 6rem;
+      }
+      pre {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 0.25rem;
+        overflow-x: auto;
+        padding: 0.75rem;
+        white-space: pre-wrap;
+      }
+      .status,
+      .error-banner {
+        border-radius: 0.25rem;
+        margin: 0.5rem 0;
+        padding: 0.5rem 0.75rem;
+      }
+      .status {
+        background: var(--surface);
+        color: var(--muted);
+      }
+      .error-banner {
+        background: color-mix(in srgb, #c62828 12%, Canvas);
+        border: 1px solid color-mix(in srgb, #c62828 35%, transparent);
+        color: inherit;
+      }
+      .error-banner:empty,
+      .status:empty {
+        display: none;
+      }
+      .grid-2 {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      }
+      dl.overview {
+        display: grid;
+        gap: 0.25rem 1rem;
+        grid-template-columns: max-content 1fr;
+        margin: 0;
+      }
+      dl.overview dt {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      dl.overview dd {
+        margin: 0;
+      }
+      ul.data-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      ul.data-list li {
+        border: 1px solid var(--border);
+        border-radius: 0.25rem;
+        margin-bottom: 0.5rem;
+        padding: 0.75rem;
+      }
+      ul.data-list li.selected {
+        border-color: color-mix(in srgb, #1565c0 50%, var(--border));
+        background: color-mix(in srgb, #1565c0 8%, Canvas);
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.875rem;
+      }
+      .row {
+        align-items: end;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
+      .row > * {
+        flex: 1 1 12rem;
+      }
+      .row > button {
+        flex: 0 0 auto;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+    </style>
   </head>
   <body>
-    <main>
+    <header>
       <h1>Brainledge</h1>
-      <section>
-        <h2>Remember</h2>
-        <textarea id="remember-input" rows="4" cols="60"></textarea>
-        <button id="remember-button" type="button">Remember</button>
+      <p>Standalone knowledge spaces — remember, recall, and explore memory projections.</p>
+      <div id="global-error" class="error-banner" role="alert" aria-live="polite"></div>
+    </header>
+
+    <nav aria-label="Sections">
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#spaces">Spaces</a></li>
+        <li><a href="#memories">Memories</a></li>
+        <li><a href="#remember">Remember</a></li>
+        <li><a href="#recall">Recall</a></li>
+        <li><a href="#ingestion">Ingestion</a></li>
+        <li><a href="#provenance">Provenance</a></li>
+        <li><a href="#timeline">Timeline</a></li>
+        <li><a href="#graph">Graph</a></li>
+      </ul>
+    </nav>
+
+    <main>
+      <section id="overview" aria-labelledby="overview-heading">
+        <h2 id="overview-heading">Overview</h2>
+        <dl class="overview" id="overview-details">
+          <dt>Principal</dt>
+          <dd id="overview-principal">Loading…</dd>
+          <dt>Selected space</dt>
+          <dd id="overview-space">ks_default</dd>
+          <dt>Episodes</dt>
+          <dd id="overview-episode-count">—</dd>
+          <dt>Facts</dt>
+          <dd id="overview-fact-count">—</dd>
+        </dl>
+        <p id="overview-status" class="status" aria-live="polite"></p>
       </section>
-      <section>
-        <h2>Recall</h2>
-        <input id="recall-input" type="search" />
-        <button id="recall-button" type="button">Recall</button>
-        <pre id="recall-output"></pre>
+
+      <section id="spaces" aria-labelledby="spaces-heading">
+        <h2 id="spaces-heading">Knowledge spaces</h2>
+        <p class="meta">Select a space to scope remember, recall, and projections.</p>
+        <ul id="spaces-list" class="data-list" aria-label="Knowledge spaces"></ul>
+        <form id="spaces-create-form">
+          <label for="space-name-input">New space name</label>
+          <div class="row">
+            <input id="space-name-input" name="name" type="text" required autocomplete="off" />
+            <button id="space-create-button" type="submit">Create space</button>
+          </div>
+        </form>
+        <p id="spaces-status" class="status" aria-live="polite"></p>
       </section>
-      <section>
-        <h2>Spaces</h2>
-        <p>
-          Standalone uses <code>ks_default</code>. Org admin is hidden until enterprise profile.
-        </p>
+
+      <section id="memories" aria-labelledby="memories-heading">
+        <h2 id="memories-heading">Memory list</h2>
+        <p class="meta">Recent episodes from the timeline projection.</p>
+        <ul id="memory-list" class="data-list" aria-label="Recent memories"></ul>
+        <p id="memories-status" class="status" aria-live="polite"></p>
       </section>
-      <section>
-        <h2>Ingestion</h2>
-        <p>Markdown ingest is available at <code>POST /api/v1/spaces/:id/ingestions</code>.</p>
+
+      <section id="remember" aria-labelledby="remember-heading">
+        <h2 id="remember-heading">Remember</h2>
+        <label for="remember-input">Content</label>
+        <textarea id="remember-input" rows="4"></textarea>
+        <div class="row">
+          <button id="remember-button" type="button">Remember</button>
+        </div>
+        <p id="remember-status" class="status" aria-live="polite"></p>
       </section>
-      <section>
-        <h2>Provenance / Timeline / Graph</h2>
-        <p>
-          Explore API projections at <code>/api/v1/spaces/:id/provenance</code> and
-          <code>/timeline</code>.
-        </p>
+
+      <section id="recall" aria-labelledby="recall-heading">
+        <h2 id="recall-heading">Recall</h2>
+        <label for="recall-input">Query</label>
+        <div class="row">
+          <input id="recall-input" type="search" autocomplete="off" />
+          <button id="recall-button" type="button">Recall</button>
+        </div>
+        <h3>Results</h3>
+        <pre id="recall-output" aria-live="polite"></pre>
+      </section>
+
+      <section id="ingestion" aria-labelledby="ingestion-heading">
+        <h2 id="ingestion-heading">Ingestion</h2>
+        <label for="ingest-markdown">Markdown</label>
+        <textarea id="ingest-markdown" rows="6"></textarea>
+        <div class="row">
+          <button id="ingest-button" type="button">Ingest markdown</button>
+        </div>
+        <p id="ingestion-status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section id="provenance" aria-labelledby="provenance-heading">
+        <h2 id="provenance-heading">Provenance explorer</h2>
+        <p class="meta">Episode → relation links from the provenance projection.</p>
+        <ul id="provenance-list" class="data-list" aria-label="Provenance items"></ul>
+        <p id="provenance-status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section id="timeline" aria-labelledby="timeline-heading">
+        <h2 id="timeline-heading">Temporal timeline</h2>
+        <ul id="timeline-list" class="data-list" aria-label="Timeline episodes"></ul>
+        <p id="timeline-status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section id="graph" aria-labelledby="graph-heading">
+        <h2 id="graph-heading">Graph explorer</h2>
+        <p class="meta">Facts rendered as subject → predicate → object triples.</p>
+        <ul id="graph-list" class="data-list" aria-label="Graph facts"></ul>
+        <p id="graph-status" class="status" aria-live="polite"></p>
       </section>
     </main>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -4,6 +4,7 @@ import { createLocalAuthorizer } from '../auth/local-authorizer.js';
 import { LOCAL_SPACE_ID, LOCAL_WORKSPACE_ID } from '../domain/ids.js';
 import { parseIsoUtc } from '../domain/time.js';
 import { localContext } from '../identity/local.js';
+import { createFakeEmbeddingProvider } from '../models/providers.js';
 import { fixedClock } from '../ports/clock.js';
 import { passthroughUnitOfWork } from '../ports/unit-of-work.js';
 
@@ -30,6 +31,8 @@ function emptySpaces(): SpaceRepository {
     get: () => Promise.resolve(undefined),
     list: () => Promise.resolve([]),
     insert: () => Promise.resolve(),
+    update: () => Promise.resolve(),
+    remove: () => Promise.resolve(),
   };
 }
 
@@ -127,5 +130,34 @@ describe('createApplication', () => {
     });
     expect(result.memories[0]?.content).toMatch(/Tokyo/u);
     expect(LOCAL_WORKSPACE_ID).toBe('ws_personal');
+  });
+
+  it('stores embeddings when a provider is configured', async () => {
+    const repos = memoryRepos();
+    const stored: { targetId: string; vector: readonly number[] }[] = [];
+    const app = createApplication({
+      clock: fixedClock(parseIsoUtc('2026-08-18T00:00:00.000Z')),
+      unitOfWork: passthroughUnitOfWork(),
+      authorizer: createLocalAuthorizer(),
+      episodes: repos.episodes,
+      evidence: repos.evidence,
+      spaces: emptySpaces(),
+      jobs: emptyJobs(),
+      embeddingProvider: createFakeEmbeddingProvider(4),
+      embeddings: {
+        upsert: ({ embedding }) => {
+          stored.push({ targetId: embedding.targetId, vector: embedding.vector });
+          return Promise.resolve();
+        },
+        list: () => Promise.resolve([]),
+        deleteByTarget: () => Promise.resolve(),
+      },
+    });
+    const remembered = await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    expect(stored[0]?.targetId).toBe(remembered.episodeId);
+    expect(stored[0]?.vector).toHaveLength(4);
   });
 });

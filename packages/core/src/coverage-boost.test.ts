@@ -79,6 +79,8 @@ describe('coverage boost', () => {
       get: () => Promise.resolve(undefined),
       list: () => Promise.resolve([]),
       insert: () => Promise.resolve(),
+      update: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
     };
     const app = createApplication({
       clock: fixedClock(parseIsoUtc('2026-08-18T00:00:00.000Z')),

@@ -1,3 +1,7 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import {
   createApplication,
   createLocalAuthorizer,
@@ -66,9 +70,10 @@ describe('http app', () => {
     expect((await app.request('/api/v1/spaces/ks_default/facts')).status).toBe(200);
     expect((await app.request('/api/v1/spaces/ks_default/timeline')).status).toBe(200);
     expect((await app.request('/api/v1/spaces/ks_default/provenance')).status).toBe(200);
-    expect((await app.request('/api/v1/spaces/ks_default/decisions')).status).toBe(501);
+    expect((await app.request('/api/v1/spaces/ks_default/decisions')).status).toBe(200);
     expect((await app.request('/api/v1/spaces/ks_default/export')).status).toBe(200);
-    expect((await app.request('/api/v1/ingestions/run_1')).status).toBe(501);
+    expect((await app.request('/api/v1/ingestions/run_1')).status).toBe(404);
+    expect((await app.request('/api/v1/workspaces')).status).toBe(200);
     expect(
       (
         await app.request('/api/v1/spaces/ks_default/ingestions', {
@@ -121,9 +126,12 @@ describe('http app', () => {
       body: JSON.stringify({ url: 'https://example.com/doc.md' }),
     });
     expect(queued.status).toBe(200);
-    const payload = (await queued.json()) as { status: string; url: string };
+    const payload = (await queued.json()) as { status: string; url: string; runId: string };
     expect(payload.status).toBe('queued');
     expect(payload.url).toBe('https://example.com/doc.md');
+    expect(payload.runId.length).toBeGreaterThan(0);
+    const status = await app.request(`/api/v1/ingestions/${payload.runId}`);
+    expect(status.status).toBe(200);
 
     const blocked = await app.request('/api/v1/spaces/ks_default/ingestions', {
       method: 'POST',
@@ -158,8 +166,12 @@ describe('http app', () => {
 
   it('includes required OpenAPI path keys', () => {
     for (const path of REQUIRED_OPENAPI_PATHS) {
-      expect(openApiDocument.paths[path]).toBeDefined();
+      expect(openApiDocument.paths[path as keyof typeof openApiDocument.paths]).toBeDefined();
     }
+    const recall = openApiDocument.paths['/api/v1/spaces/{spaceId}/recall'].post as {
+      requestBody?: unknown;
+    };
+    expect(recall.requestBody).toBeDefined();
   });
 
   it('serves bundled UI html when provided', async () => {
@@ -209,5 +221,64 @@ describe('http app', () => {
     expect(internal.status).toBe(500);
     const internalBody = (await internal.json()) as { error: { code: string } };
     expect(internalBody.error.code).toBe('INTERNAL');
+  });
+
+  it('creates spaces, records decisions, and dedupes ingestions', async () => {
+    const application = createTestApplication();
+    const app = createHttpApp(application);
+    const created = await app.request('/api/v1/spaces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'notes' }),
+    });
+    expect(created.status).toBe(200);
+    const space = (await created.json()) as { id: string; name: string };
+    expect(space.name).toBe('notes');
+    expect((await app.request(`/api/v1/spaces/${space.id}`)).status).toBe(200);
+    const patched = await app.request(`/api/v1/spaces/${space.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'renamed' }),
+    });
+    expect(patched.status).toBe(200);
+    const decision = await app.request(`/api/v1/spaces/${space.id}/decisions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'keep', rationale: 'ok' }),
+    });
+    expect(decision.status).toBe(200);
+    const listed = (await (await app.request(`/api/v1/spaces/${space.id}/decisions`)).json()) as {
+      items: unknown[];
+    };
+    expect(listed.items).toHaveLength(1);
+    const first = await app.request(`/api/v1/spaces/${space.id}/ingestions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ markdown: '# Hi', idempotencyKey: 'ing-1' }),
+    });
+    expect(first.status).toBe(200);
+    const firstBody = (await first.json()) as { runId: string; status: string };
+    expect(firstBody.status).toBe('succeeded');
+    const second = await app.request(`/api/v1/spaces/${space.id}/ingestions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ markdown: '# Hi again', idempotencyKey: 'ing-1' }),
+    });
+    const secondBody = (await second.json()) as { runId: string };
+    expect(secondBody.runId).toBe(firstBody.runId);
+    expect((await app.request(`/api/v1/spaces/${space.id}`, { method: 'DELETE' })).status).toBe(
+      200,
+    );
+  });
+
+  it('serves UI assets from uiAssetRoot', async () => {
+    const application = createTestApplication();
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'brainledge-ui-'));
+    writeFileSync(path.join(directory, 'app.js'), 'console.log("ui")');
+    const app = createHttpApp(application, { uiAssetRoot: directory });
+    const response = await app.request('/assets/app.js');
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('ui');
+    expect((await app.request('/assets/nope.js')).status).toBe(404);
   });
 });

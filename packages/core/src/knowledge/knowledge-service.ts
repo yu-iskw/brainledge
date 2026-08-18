@@ -118,6 +118,7 @@ export function createKnowledgeService(deps: {
               ...fact,
               id: asFactId(newId('fact')),
               subject: { entityId },
+              sourceEpisodeId: episode.id,
             };
             if (previous !== undefined) {
               const { previous: closed } = supersedeFact(previous, nextFact, now);

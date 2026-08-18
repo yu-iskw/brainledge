@@ -1,5 +1,7 @@
+import { createInMemoryIngestionRepository } from '../ingestion/in-memory-ingestion.js';
 import { createKnowledgeService } from '../knowledge/knowledge-service.js';
 import { createMemoryService } from '../memory/memory-service.js';
+import { createInMemoryDecisionRepository } from '../ports/decision-repository.js';
 
 import type { Authorizer } from '../auth/authorizer.js';
 import type { KnowledgeService } from '../knowledge/knowledge-service.js';
@@ -7,11 +9,13 @@ import type { MemoryService } from '../memory/memory-service.js';
 import type { EmbeddingProvider, TextGenerationProvider } from '../models/providers.js';
 import type { PluginManifest } from '../plugins/manifest.js';
 import type { Clock } from '../ports/clock.js';
+import type { DecisionRepository } from '../ports/decision-repository.js';
 import type { EmbeddingStore } from '../ports/embedding-store.js';
 import type { EntityRepository } from '../ports/entity-repository.js';
 import type { EpisodeRepository } from '../ports/episode-repository.js';
 import type { EvidenceRepository } from '../ports/evidence-repository.js';
 import type { FactRepository } from '../ports/fact-repository.js';
+import type { IngestionRepository } from '../ports/ingestion-repository.js';
 import type { JobRepository } from '../ports/job-repository.js';
 import type { SpaceRepository } from '../ports/space-repository.js';
 import type { UnitOfWork } from '../ports/unit-of-work.js';
@@ -29,13 +33,20 @@ export interface ApplicationPorts {
   readonly embeddings?: EmbeddingStore;
   readonly embeddingProvider?: EmbeddingProvider;
   readonly textGenerationProvider?: TextGenerationProvider;
+  readonly ingestions?: IngestionRepository;
+  readonly decisions?: DecisionRepository;
   readonly plugins?: readonly PluginManifest[];
 }
 
 export interface Application {
   readonly memory: MemoryService;
   readonly knowledge?: KnowledgeService;
-  readonly ports: ApplicationPorts;
+  readonly ports: ResolvedApplicationPorts;
+}
+
+export interface ResolvedApplicationPorts extends ApplicationPorts {
+  readonly ingestions: IngestionRepository;
+  readonly decisions: DecisionRepository;
 }
 
 export function createApplication(ports: ApplicationPorts): Application {
@@ -56,8 +67,13 @@ export function createApplication(ports: ApplicationPorts): Application {
           facts: ports.facts,
           entities: ports.entities,
         });
+  const resolved: ResolvedApplicationPorts = {
+    ...ports,
+    ingestions: ports.ingestions ?? createInMemoryIngestionRepository(),
+    decisions: ports.decisions ?? createInMemoryDecisionRepository(),
+  };
   return {
-    ports,
+    ports: resolved,
     knowledge,
     memory: createMemoryService({
       authorizer: ports.authorizer,
@@ -68,6 +84,7 @@ export function createApplication(ports: ApplicationPorts): Application {
       facts: ports.facts,
       knowledge,
       embeddings: ports.embeddings,
+      embeddingProvider: ports.embeddingProvider,
     }),
   };
 }

@@ -2,7 +2,12 @@ import { asKnowledgeSpaceId, asPrincipalId, asWorkspaceId } from '@brainledge/co
 
 import { assertWorkspaceScope } from '../scope.js';
 
-import type { KnowledgeSpace, SpaceRepository } from '@brainledge/core';
+import type {
+  KnowledgeSpace,
+  KnowledgeSpaceId,
+  SpaceRepository,
+  WorkspaceId,
+} from '@brainledge/core';
 import type { DatabaseSync } from 'node:sqlite';
 
 interface SpaceRow {
@@ -47,6 +52,27 @@ export function createSqliteSpaceRepository(database: DatabaseSync): SpaceReposi
            VALUES (?, ?, ?, ?, ?)`,
         )
         .run(space.id, space.workspaceId, space.ownerPrincipalId, space.name, space.visibility);
+      return Promise.resolve();
+    },
+
+    async update(input: { workspaceId: WorkspaceId; space: KnowledgeSpace }) {
+      const { workspaceId, space } = input;
+      assertWorkspaceScope(space.workspaceId, workspaceId);
+      database
+        .prepare(
+          `UPDATE knowledge_spaces
+           SET owner_principal_id = ?, name = ?, visibility = ?
+           WHERE id = ? AND workspace_id = ?`,
+        )
+        .run(space.ownerPrincipalId, space.name, space.visibility, space.id, workspaceId);
+      return Promise.resolve();
+    },
+
+    remove(input: { workspaceId: WorkspaceId; spaceId: KnowledgeSpaceId }) {
+      const { workspaceId, spaceId } = input;
+      database
+        .prepare('DELETE FROM knowledge_spaces WHERE id = ? AND workspace_id = ?')
+        .run(spaceId, workspaceId);
       return Promise.resolve();
     },
   };

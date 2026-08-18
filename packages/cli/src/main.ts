@@ -71,12 +71,22 @@ const COMMANDS: Record<string, CommandHandler> = {
         readPositional(rest, VALUE_FLAGS),
         readFlag(rest, DATA_DIR_FLAG),
         parseForgetMode(readFlag(rest, '--mode')),
+        readFlag(rest, '--server'),
+        undefined,
+        readFlag(rest, '--token'),
       ),
     );
     return 0;
   },
   async consolidate(rest) {
-    console.log(await cmdConsolidate(readFlag(rest, DATA_DIR_FLAG)));
+    console.log(
+      await cmdConsolidate(
+        readFlag(rest, DATA_DIR_FLAG),
+        readFlag(rest, '--server'),
+        undefined,
+        readFlag(rest, '--token'),
+      ),
+    );
     return 0;
   },
   status(rest) {

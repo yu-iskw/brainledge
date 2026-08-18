@@ -1,5 +1,5 @@
 import type { EntityRef } from './entity.js';
-import type { EntityId, FactId, KnowledgeSpaceId, WorkspaceId } from '../domain/ids.js';
+import type { EntityId, EpisodeId, FactId, KnowledgeSpaceId, WorkspaceId } from '../domain/ids.js';
 import type { IsoUtcTimestamp } from '../domain/time.js';
 import type { PrincipalRef } from '../identity/principal.js';
 
@@ -32,6 +32,7 @@ export interface Fact {
   readonly confidence?: number;
   readonly status: FactStatus;
   readonly createdBy: PrincipalRef;
+  readonly sourceEpisodeId?: EpisodeId;
 }
 
 export function deriveFactStatus(fact: Fact): FactStatus {

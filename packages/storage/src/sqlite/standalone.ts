@@ -48,6 +48,7 @@ export function openStandalone(dataDir: string): StandaloneHandle {
     facts: createSqliteFactRepository(database),
     entities: createSqliteEntityRepository(database),
     embeddings: createSqliteEmbeddingStore(database),
+    ingestions,
   });
   return {
     application,

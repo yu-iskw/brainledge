@@ -81,6 +81,7 @@ describe('remaining kernels', () => {
           capturedAt: fact.assertedAt,
         },
         createdAt: fact.assertedAt,
+        status: 'proposed',
       }).action,
     ).toBe('keep');
     expect((await createFakeTextGenerationProvider().generate({ prompt: 'hi' })).text).toMatch(

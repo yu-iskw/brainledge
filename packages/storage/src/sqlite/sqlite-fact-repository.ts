@@ -1,5 +1,6 @@
 import {
   asEntityId,
+  asEpisodeId,
   asFactId,
   asKnowledgeSpaceId,
   asPrincipalId,
@@ -28,6 +29,7 @@ interface FactRow {
   confidence: number | null;
   status: Fact['status'];
   created_by: string;
+  source_episode_id: string | null;
 }
 
 function mapFact(row: FactRow): Fact {
@@ -47,6 +49,8 @@ function mapFact(row: FactRow): Fact {
     confidence: row.confidence ?? undefined,
     status: row.status,
     createdBy: { principalId: asPrincipalId(row.created_by) },
+    sourceEpisodeId:
+      row.source_episode_id === null ? undefined : asEpisodeId(row.source_episode_id),
   };
 }
 
@@ -59,8 +63,9 @@ function persist(
   assertWorkspaceScope(fact.workspaceId, workspaceId);
   const sql = `${orReplace ? 'INSERT OR REPLACE' : 'INSERT'} INTO facts (
     id, workspace_id, knowledge_space_id, subject_id, predicate_id, object_json,
-    valid_from, valid_until, asserted_at, retracted_at, reference_time, confidence, status, created_by
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    valid_from, valid_until, asserted_at, retracted_at, reference_time, confidence, status, created_by,
+    source_episode_id
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   database
     .prepare(sql)
     .run(
@@ -78,6 +83,7 @@ function persist(
       fact.confidence ?? null,
       fact.status,
       fact.createdBy.principalId,
+      fact.sourceEpisodeId === undefined ? null : fact.sourceEpisodeId,
     );
 }
 

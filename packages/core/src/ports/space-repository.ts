@@ -8,4 +8,6 @@ export interface SpaceRepository {
   }): Promise<KnowledgeSpace | undefined>;
   list(input: { workspaceId: WorkspaceId }): Promise<readonly KnowledgeSpace[]>;
   insert(input: { workspaceId: WorkspaceId; space: KnowledgeSpace }): Promise<void>;
+  update(input: { workspaceId: WorkspaceId; space: KnowledgeSpace }): Promise<void>;
+  remove(input: { workspaceId: WorkspaceId; spaceId: KnowledgeSpaceId }): Promise<void>;
 }

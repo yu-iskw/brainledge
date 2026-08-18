@@ -6,10 +6,18 @@ import { SCHEMA_VERSION, SQLITE_SCHEMA } from './schema.js';
 
 import type { UnitOfWork } from '@brainledge/core';
 
+function ensureFactSourceEpisodeColumn(database: DatabaseSync): void {
+  const columns = database.prepare('PRAGMA table_info(facts)').all() as { name: string }[];
+  if (!columns.some((column) => column.name === 'source_episode_id')) {
+    database.exec('ALTER TABLE facts ADD COLUMN source_episode_id TEXT');
+  }
+}
+
 export function openSqliteDatabase(filePath: string): DatabaseSync {
   mkdirSync(path.dirname(filePath), { recursive: true });
   const database = new DatabaseSync(filePath);
   database.exec(SQLITE_SCHEMA);
+  ensureFactSourceEpisodeColumn(database);
   const row = database.prepare('SELECT version FROM schema_metadata LIMIT 1').get() as
     { version: number } | undefined;
   if (row === undefined) {

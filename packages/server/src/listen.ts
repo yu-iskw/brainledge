@@ -9,9 +9,13 @@ export function defaultListenPort(): number {
 }
 
 export function prepareListen(): void {
+  const apiToken = process.env.BRAINLEDGE_API_TOKEN;
   assertListenPolicy({
     host: defaultListenHost(),
     port: defaultListenPort(),
-    allowNonLoopbackWithoutAuth: process.env.BRAINLEDGE_UNSAFE_BIND === '1',
+    unsafeBind: process.env.BRAINLEDGE_UNSAFE_BIND === '1',
+    authenticationConfigured:
+      (apiToken !== undefined && apiToken.length > 0) ||
+      (process.env.OIDC_ISSUER !== undefined && process.env.OIDC_ISSUER.length > 0),
   });
 }

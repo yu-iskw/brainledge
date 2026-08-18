@@ -134,9 +134,26 @@ export async function cmdForget(
   memoryId: string,
   dataDirFlag?: string,
   mode: ForgetMode = 'hide',
+  serverUrl?: string,
+  fetchImpl?: FetchImpl,
+  apiToken?: string,
 ): Promise<string> {
   if (memoryId.length === 0) {
     throw new Error('forget requires a memory id');
+  }
+  if (serverUrl !== undefined && serverUrl.length > 0) {
+    const fetchFn = fetchImpl ?? fetch;
+    const response = await fetchFn(
+      `${serverUrl}/api/v1/spaces/${LOCAL_SPACE_ID}/memories/${memoryId}?mode=${mode}`,
+      {
+        method: 'DELETE',
+        headers: jsonHeaders(apiToken),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(failedStatusMessage('forget', response.status));
+    }
+    return `forgot ${memoryId} (${mode})`;
   }
   const dataDir = resolveDataDir(dataDirFlag);
   const handle = openStandalone(dataDir);
@@ -152,7 +169,24 @@ export async function cmdForget(
   }
 }
 
-export async function cmdConsolidate(dataDirFlag?: string): Promise<string> {
+export async function cmdConsolidate(
+  dataDirFlag?: string,
+  serverUrl?: string,
+  fetchImpl?: FetchImpl,
+  apiToken?: string,
+): Promise<string> {
+  if (serverUrl !== undefined && serverUrl.length > 0) {
+    const fetchFn = fetchImpl ?? fetch;
+    const response = await fetchFn(`${serverUrl}/api/v1/spaces/${LOCAL_SPACE_ID}/consolidate`, {
+      method: 'POST',
+      headers: jsonHeaders(apiToken),
+    });
+    if (!response.ok) {
+      throw new Error(failedStatusMessage('consolidate', response.status));
+    }
+    const body = (await response.json()) as { factCount: number };
+    return `consolidated ${String(body.factCount)} facts`;
+  }
   const dataDir = resolveDataDir(dataDirFlag);
   const handle = openStandalone(dataDir);
   try {

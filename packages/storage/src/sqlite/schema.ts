@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS facts (
   reference_time TEXT,
   confidence REAL,
   status TEXT NOT NULL,
-  created_by TEXT NOT NULL
+  created_by TEXT NOT NULL,
+  source_episode_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS fact_evidence (

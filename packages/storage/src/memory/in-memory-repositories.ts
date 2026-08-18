@@ -12,6 +12,7 @@ import type {
   KnowledgeSpace,
   SpaceRepository,
   UnitOfWork,
+  WorkspaceId,
 } from '@brainledge/core';
 
 interface InMemoryStores {
@@ -129,6 +130,26 @@ export function createInMemorySpaceRepository(store: InMemoryStores): SpaceRepos
     async insert({ workspaceId, space }) {
       assertWorkspaceScope(space.workspaceId, workspaceId);
       store.spaces.push(space);
+      return Promise.resolve();
+    },
+    async update(input: { workspaceId: WorkspaceId; space: KnowledgeSpace }) {
+      const { workspaceId, space } = input;
+      assertWorkspaceScope(space.workspaceId, workspaceId);
+      const index = store.spaces.findIndex(
+        (item) => item.workspaceId === workspaceId && item.id === space.id,
+      );
+      if (index >= 0) {
+        store.spaces[index] = space;
+      }
+      return Promise.resolve();
+    },
+    remove({ workspaceId, spaceId }) {
+      const index = store.spaces.findIndex(
+        (item) => item.workspaceId === workspaceId && item.id === spaceId,
+      );
+      if (index >= 0) {
+        store.spaces.splice(index, 1);
+      }
       return Promise.resolve();
     },
   };

@@ -35,6 +35,8 @@ function emptySpaces(): SpaceRepository {
     get: () => Promise.resolve(undefined),
     list: () => Promise.resolve([]),
     insert: () => Promise.resolve(),
+    update: () => Promise.resolve(),
+    remove: () => Promise.resolve(),
   };
 }
 

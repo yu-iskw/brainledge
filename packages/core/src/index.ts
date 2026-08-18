@@ -91,7 +91,11 @@ export type {
   RememberInput,
 } from './memory/types.js';
 export { createApplication } from './app/create-application.js';
-export type { Application, ApplicationPorts } from './app/create-application.js';
+export type {
+  Application,
+  ApplicationPorts,
+  ResolvedApplicationPorts,
+} from './app/create-application.js';
 export {
   createFakeEmbeddingProvider,
   createFakeTextGenerationProvider,
@@ -171,6 +175,10 @@ export { findContradictoryPairs } from './knowledge/contradictions.js';
 export { supersedeFact } from './knowledge/supersede.js';
 export { normalizeAlias, resolveEntityByAlias } from './knowledge/resolution.js';
 export { createDecision } from './knowledge/decision.js';
+export type { ContextSnapshot, DecisionRecord } from './knowledge/decision.js';
+export { createInMemoryDecisionRepository } from './ports/decision-repository.js';
+export type { DecisionRepository } from './ports/decision-repository.js';
+export { createInMemoryIngestionRepository } from './ingestion/in-memory-ingestion.js';
 export { runQueuedJobs } from './jobs/runner.js';
 export { hashLocalApiToken, verifyLocalApiToken } from './auth/local-token.js';
 export { isDelegationActive } from './auth/delegation.js';

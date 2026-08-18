@@ -14,7 +14,13 @@ import {
   cmdMigrate,
   describeServeMode,
 } from '../../src/commands/io.js';
-import { cmdInit, cmdRemember, cmdRecall } from '../../src/commands/memory.js';
+import {
+  cmdConsolidate,
+  cmdForget,
+  cmdInit,
+  cmdRemember,
+  cmdRecall,
+} from '../../src/commands/memory.js';
 
 describe('import export migrate', () => {
   it('round-trips memories and requires migrate consent', async () => {
@@ -101,6 +107,31 @@ describe('import export migrate', () => {
     const recalled = await cmdRecall('Alice', undefined, serverUrl, fetchImpl);
     expect(recalled).toMatch(/Tokyo/u);
     expect(calls[1].url).toBe(`${serverUrl}/api/v1/spaces/ks_default/recall`);
+  });
+
+  it('forgets and consolidates via remote server URL with injected fetch', async () => {
+    const calls: { url: string; method: string }[] = [];
+    const fetchImpl = (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
+      calls.push({ url: urlStr, method: init?.method ?? 'GET' });
+      if (urlStr.includes('/memories/ep_remote_1')) {
+        return Promise.resolve(new Response(null, { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ factCount: 3 }), { status: 200 }));
+    };
+    const serverUrl = 'http://127.0.0.1:8787';
+    expect(await cmdForget('ep_remote_1', undefined, 'hide', serverUrl, fetchImpl)).toMatch(
+      /forgot ep_remote_1/u,
+    );
+    expect(calls[0]).toEqual({
+      url: `${serverUrl}/api/v1/spaces/ks_default/memories/ep_remote_1?mode=hide`,
+      method: 'DELETE',
+    });
+    expect(await cmdConsolidate(undefined, serverUrl, fetchImpl)).toMatch(/consolidated 3 facts/u);
+    expect(calls[1]).toEqual({
+      url: `${serverUrl}/api/v1/spaces/ks_default/consolidate`,
+      method: 'POST',
+    });
   });
 
   it('sends Bearer token for remote remember/recall', async () => {

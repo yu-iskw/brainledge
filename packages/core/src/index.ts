@@ -60,8 +60,14 @@ export {
   deriveFactStatus,
   factIdentityKey,
   factObjectKey,
+  factVisibleAt,
   subjectPredicateKey,
 } from './knowledge/fact.js';
+export {
+  formatFactSentence,
+  humanizeEntityId,
+  humanizePredicate,
+} from './memory/format-fact-sentence.js';
 export type { Fact, FactObject, FactStatus, LiteralValue, PredicateRef } from './knowledge/fact.js';
 export type { ProvenanceEdge, ProvenanceRef, ProvenanceRelation } from './knowledge/provenance.js';
 export type { Clock } from './ports/clock.js';
@@ -178,7 +184,7 @@ export { buildContext } from './search/context-builder.js';
 export { createIdentityReranker } from './search/rerank.js';
 export type { RerankPort } from './search/rerank.js';
 export { createKnowledgeService } from './knowledge/knowledge-service.js';
-export type { KnowledgeService } from './knowledge/knowledge-service.js';
+export type { KnowledgeService, ProposedFact } from './knowledge/knowledge-service.js';
 export { findContradictoryPairs } from './knowledge/contradictions.js';
 export { supersedeFact } from './knowledge/supersede.js';
 export { normalizeAlias, resolveEntityByAlias } from './knowledge/resolution.js';

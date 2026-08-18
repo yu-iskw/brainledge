@@ -20,6 +20,7 @@ describe('extractTypedFacts', () => {
     expect(facts).toHaveLength(1);
     expect(facts[0]?.predicate.id).toBe('livesIn');
     expect(facts[0]?.object).toEqual({ kind: 'text', value: 'Tokyo' });
+    expect(facts[0]?.validFrom).toBe('2026-07-01T00:00:00.000Z');
   });
 
   it('extracts worksAt from a workplace sentence', () => {

@@ -9,6 +9,7 @@ import { fixedClock } from '../ports/clock.js';
 import { passthroughUnitOfWork } from '../ports/unit-of-work.js';
 
 import { findContradictoryPairs } from './contradictions.js';
+import { factVisibleAt } from './fact.js';
 
 import type { Entity, EntityAlias } from '../knowledge/entity.js';
 import type { Episode } from '../knowledge/episode.js';
@@ -90,8 +91,14 @@ function knowledgeApp() {
       return Promise.resolve();
     },
     findById: ({ factId }) => Promise.resolve(facts.find((item) => item.id === factId)),
-    query: ({ limit }) =>
-      Promise.resolve(facts.filter((item) => item.retractedAt === undefined).slice(0, limit)),
+    query: ({ asOf, limit }) =>
+      Promise.resolve(
+        facts
+          .filter((item) =>
+            asOf === undefined ? item.retractedAt === undefined : factVisibleAt(item, asOf),
+          )
+          .slice(0, limit),
+      ),
     findContradictions: () => Promise.resolve(findContradictoryPairs(facts)),
     purgeBySourceEpisode: ({ sourceEpisodeId }) => {
       for (let index = facts.length - 1; index >= 0; index -= 1) {
@@ -176,6 +183,19 @@ describe('knowledge consolidate', () => {
     const active = queried?.filter((item) => item.retractedAt === undefined) ?? [];
     expect(active).toHaveLength(1);
     expect(active[0]?.object).toEqual({ kind: 'text', value: 'Paris' });
+    const july = await app.knowledge?.queryFacts(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      asOf: '2026-07-15T23:59:59.000Z',
+    });
+    expect(july?.map((item) => (item.object.kind === 'text' ? item.object.value : ''))).toEqual([
+      'Tokyo',
+    ]);
+    const julyRecall = await app.memory.recall(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      query: 'Where does Alice live?',
+      asOf: '2026-07-15T23:59:59.000Z',
+    });
+    expect(julyRecall.facts.map((fact) => fact.objectText)).toEqual(['Tokyo']);
   });
 
   it('does not insert a duplicate livesIn when consolidating twice', async () => {
@@ -189,5 +209,27 @@ describe('knowledge consolidate', () => {
     expect(second.factCount).toBe(0);
     const queried = await app.knowledge?.queryFacts(localContext(), { spaceId: LOCAL_SPACE_ID });
     expect(queried?.filter((item) => item.retractedAt === undefined)).toHaveLength(1);
+  });
+
+  it('previews livesIn supersession without persisting', async () => {
+    const { app } = knowledgeApp();
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    await app.memory.consolidate(localContext(), { spaceId: LOCAL_SPACE_ID });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Paris in August 2026.',
+    });
+    const preview = await app.knowledge?.previewExtract(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+    });
+    expect(preview?.factCount).toBe(1);
+    expect(preview?.proposed[0]?.objectText).toBe('Paris');
+    expect(preview?.proposed[0]?.closes).toBe('Alice lives in Tokyo');
+    const stillTokyo = await app.knowledge?.queryFacts(localContext(), { spaceId: LOCAL_SPACE_ID });
+    expect(stillTokyo?.filter((item) => item.retractedAt === undefined)).toHaveLength(1);
+    expect(stillTokyo?.[0]?.object).toEqual({ kind: 'text', value: 'Tokyo' });
   });
 });

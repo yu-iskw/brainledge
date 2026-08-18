@@ -1,6 +1,7 @@
 import {
   createCamera,
   fitCamera,
+  hitTestEdge,
   hitTestNode,
   neighborIds,
   panCamera,
@@ -33,7 +34,7 @@ export interface GraphViewHandle {
 export function bindKnowledgeGraph(
   canvas: HTMLCanvasElement,
   palette: GraphPalette,
-  onSelect: (node: LaidOutNode | undefined, edgeEpisodeId: string | undefined) => void,
+  onSelect: (node: LaidOutNode | undefined, edge: KnowledgeGraphEdge | undefined) => void,
 ): GraphViewHandle {
   const ctx = canvas.getContext('2d');
   if (ctx === null) {
@@ -43,6 +44,7 @@ export function bindKnowledgeGraph(
   let edges: readonly KnowledgeGraphEdge[] = [];
   let camera = createCamera();
   let selectedId: string | undefined;
+  let selectedEdgeId: string | undefined;
   let hoveredId: string | undefined;
   let dragging = false;
   let moved = 0;
@@ -73,6 +75,24 @@ export function bindKnowledgeGraph(
     return { width, height };
   };
 
+  const focusIds = (): ReadonlySet<string> => {
+    if (selectedEdgeId !== undefined) {
+      const edge = edges.find((item) => item.id === selectedEdgeId);
+      if (edge !== undefined) {
+        return new Set([edge.sourceId, edge.targetId]);
+      }
+    }
+    return neighborIds(selectedId, edges);
+  };
+
+  const incidentEdge = (nodeId: string | undefined): KnowledgeGraphEdge | undefined => {
+    if (nodeId === undefined) {
+      return undefined;
+    }
+    const outgoing = edges.find((item) => item.sourceId === nodeId);
+    return outgoing ?? edges.find((item) => item.targetId === nodeId);
+  };
+
   const redraw = (): void => {
     const { width, height } = size();
     drawKnowledgeGraph(ctx, width, height, palette, {
@@ -80,8 +100,9 @@ export function bindKnowledgeGraph(
       edges,
       camera,
       selectedId,
+      selectedEdgeId,
       hoveredId,
-      focusIds: neighborIds(selectedId, edges),
+      focusIds: focusIds(),
     });
   };
 
@@ -135,11 +156,13 @@ export function bindKnowledgeGraph(
       redraw();
       return;
     }
-    const hit = hitTestNode(nodes, camera, point.x, point.y);
-    const next = hit?.id;
+    const hitNode = hitTestNode(nodes, camera, point.x, point.y);
+    const hitEdge =
+      hitNode === undefined ? hitTestEdge(nodes, edges, camera, point.x, point.y) : undefined;
+    const next = hitNode?.id;
+    canvas.style.cursor = hitNode === undefined && hitEdge === undefined ? 'grab' : 'pointer';
     if (next !== hoveredId) {
       hoveredId = next;
-      canvas.style.cursor = next === undefined ? 'grab' : 'pointer';
       redraw();
     }
   };
@@ -150,11 +173,12 @@ export function bindKnowledgeGraph(
       return;
     }
     const point = localPoint(event);
-    const hit = hitTestNode(nodes, camera, point.x, point.y);
-    selectedId = hit?.id;
-    const outgoing = edges.find((item) => item.sourceId === selectedId);
-    const incident = outgoing ?? edges.find((item) => item.targetId === selectedId);
-    onSelect(hit, incident?.sourceEpisodeId);
+    const hitNode = hitTestNode(nodes, camera, point.x, point.y);
+    const hitEdge =
+      hitNode === undefined ? hitTestEdge(nodes, edges, camera, point.x, point.y) : undefined;
+    selectedId = hitNode?.id;
+    selectedEdgeId = hitEdge?.id;
+    onSelect(hitNode, hitEdge);
     redraw();
   };
 
@@ -183,6 +207,7 @@ export function bindKnowledgeGraph(
       lastEdges = nextEdges;
       edges = nextEdges;
       selectedId = undefined;
+      selectedEdgeId = undefined;
       hoveredId = undefined;
       const { width, height } = size();
       applyLayout(width, height);
@@ -194,10 +219,14 @@ export function bindKnowledgeGraph(
     },
     selectNode(id) {
       selectedId = id;
+      selectedEdgeId = undefined;
+      const node = id === undefined ? undefined : nodes.find((item) => item.id === id);
+      onSelect(node, undefined);
       redraw();
     },
     focusNode(id) {
       selectedId = id;
+      selectedEdgeId = undefined;
       if (id === undefined) {
         onSelect(undefined, undefined);
         redraw();
@@ -212,9 +241,7 @@ export function bindKnowledgeGraph(
       const { width, height } = size();
       const screen = worldToScreen(camera, node.x, node.y);
       camera = panCamera(camera, width / 2 - screen.x, height / 2 - screen.y);
-      const outgoing = edges.find((item) => item.sourceId === selectedId);
-      const incident = outgoing ?? edges.find((item) => item.targetId === selectedId);
-      onSelect(node, incident?.sourceEpisodeId);
+      onSelect(node, incidentEdge(id));
       redraw();
     },
     nodeIds() {

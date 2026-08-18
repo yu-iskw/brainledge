@@ -32,6 +32,13 @@ async function canvasShot(page: Page, name: string): Promise<void> {
   await page.locator('.graph-frame').screenshot({ path: `${screenshotDir}/${name}` });
 }
 
+async function extractAndAccept(page: Page): Promise<void> {
+  await page.locator('#consolidate-button').click();
+  await expect(page.locator('#extract-accept-all')).toBeVisible();
+  await page.locator('#extract-accept-all').click();
+  await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+}
+
 test('knowledge map canvas interactions produce a screenshot gallery', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('/');
@@ -53,8 +60,7 @@ test('knowledge map canvas interactions produce a screenshot gallery', async ({ 
   await expect(page.locator('#graph-empty')).toBeVisible();
   await canvasShot(page, '007-graph-empty.png');
 
-  await page.locator('#consolidate-button').click();
-  await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+  await extractAndAccept(page);
   await expect(page.locator('#graph-caption')).toContainText(/nodes/iu);
   await expect(page.locator('#knowledge-graph')).toBeVisible();
   await expect

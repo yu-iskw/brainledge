@@ -1,4 +1,4 @@
-import { findContradictoryPairs } from '@brainledge/core';
+import { factVisibleAt, findContradictoryPairs } from '@brainledge/core';
 
 import { assertWorkspaceScope } from '../scope.js';
 
@@ -33,10 +33,7 @@ export function createInMemoryFactRepository(facts: Fact[] = []): FactRepository
             (item) =>
               item.workspaceId === workspaceId &&
               item.knowledgeSpaceId === knowledgeSpaceId &&
-              (asOf === undefined
-                ? item.retractedAt === undefined
-                : item.assertedAt <= asOf &&
-                  (item.retractedAt === undefined || item.retractedAt > asOf)),
+              (asOf === undefined ? item.retractedAt === undefined : factVisibleAt(item, asOf)),
           )
           .slice(0, limit),
       );

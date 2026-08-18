@@ -3,6 +3,8 @@ import { openStandalone } from '@brainledge/storage';
 
 import { initDataDir, resolveDataDir } from '../data-dir.js';
 
+import { formatRecall } from './format-recall.js';
+
 type FetchImpl = typeof fetch;
 
 export function cmdInit(dataDirFlag?: string): string {
@@ -19,21 +21,6 @@ function resolveApiToken(explicit?: string): string | undefined {
   }
   const fromEnv = process.env.BRAINLEDGE_API_TOKEN;
   return fromEnv !== undefined && fromEnv.length > 0 ? fromEnv : undefined;
-}
-
-function formatRecall(result: {
-  readonly memories: readonly { readonly content: string }[];
-  readonly facts?: readonly { readonly summary: string }[];
-}): string {
-  if (result.memories.length === 0) {
-    return 'No memories found.';
-  }
-  const memories = result.memories.map((hit) => hit.content).join('\n---\n');
-  const facts = result.facts;
-  if (facts === undefined || facts.length === 0) {
-    return memories;
-  }
-  return `${memories}\n\nFacts:\n${facts.map((hit) => hit.summary).join('\n')}`;
 }
 
 function jsonHeaders(apiToken?: string): Record<string, string> {
@@ -105,7 +92,7 @@ export async function cmdRecall(
     }
     const body = (await response.json()) as {
       memories: { content: string }[];
-      facts?: { summary: string }[];
+      facts?: { summary: string; subjectId?: string; predicateId?: string; objectText?: string }[];
     };
     return formatRecall(body);
   }

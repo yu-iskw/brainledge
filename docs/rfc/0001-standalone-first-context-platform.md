@@ -77,6 +77,7 @@ The original RFC’s **direction is right**. Its **delivery shape would recreate
 16. **Composition root was in `server`.** Original §6.3 put application composition in `@brainledge/server`. CLI would then re-implement wiring. Composition is in `core`.
 17. **CLI binary was `app`.** Binary name is `brainledge`.
 18. **P2 was demand-gated.** All twenty P2 items are implemented as optional adapters in Phase 7.
+19. **Walking-skeleton extract is live.** Phase 1 recall is lexical over episodes PLUS post-consolidate fact hits. Curator-loop UI (extract review, map-first Inspect, fact-first Recall) is Phase 4 productization, not a new domain model. RFC Phase 1 "facts empty until Phase 4" is superseded by the walking-skeleton extract; extraction is still not `remember()`.
 
 **Unchanged:** one semantic model, SQL baseline, append-only history, authn ≠ authz, memory as facade, no mandatory graph DB, loopback fail-closed, MCP and REST share use cases, `core` imports no frameworks.
 
@@ -546,7 +547,7 @@ await memory.consolidate({ spaceId });
 **P0 / Phase 1:**
 
 - `remember` writes Episode + Evidence (synchronous).
-- `recall` is **lexical (SQLite FTS) + recency over episode text**. It returns structured `RecallResult` with memories populated; `facts` and `entities` arrays are empty until Phase 4.
+- `recall` is **lexical (SQLite FTS) + recency over episode text**. It returns structured `RecallResult` with memories populated; `facts` and `entities` arrays are empty until Phase 4. **Superseded by walking-skeleton extract:** facts populate after `consolidate`; they remain empty immediately after `remember`.
 - `forget` supports `hide` and `delete` only. `retract` and `purge` are Phase 6 (P1-035).
 - No LLM, no extraction, no embeddings required.
 
@@ -687,7 +688,7 @@ Hono REST `/api/v1` (Phase 2 routes exist even when collections are empty so Ope
 - spaces CRUD
 - `POST .../memories`, `POST .../recall`
 - ingestions and ingestion status
-- entity/fact reads (empty until Phase 4)
+- entity/fact reads (empty until Phase 4; **superseded for recall hits:** facts populate after `consolidate`, still empty immediately after `remember`. Dedicated entity/fact REST collections remain Phase 4 productization)
 - provenance (empty until Phase 4)
 - decisions (empty until Phase 5)
 - timeline, export
@@ -770,7 +771,7 @@ Built-in strategies: recent, lexical, vector, graph, entity (Phase 4); prior-dec
 
 Context budget (Phase 5): token-budget builder that exposes omissions.
 
-`RecallResult` is structured from Phase 1 (memories only) and expands in Phases 4–5. Never concatenate undifferentiated text as the only result.
+`RecallResult` is structured from Phase 1 (memories only) and expands in Phases 4–5. **Superseded by walking-skeleton extract:** post-consolidate fact hits are included in Phase 1 recall; facts remain empty immediately after `remember`. Never concatenate undifferentiated text as the only result.
 
 ---
 
@@ -1000,7 +1001,7 @@ Writes Episode + Evidence. No extraction.
 
 ### P0-015 — Memory `recall` use case — Phase 1
 
-Lexical + recency over episodes. Structured `RecallResult`; facts/entities empty until Phase 4.
+Lexical + recency over episodes. Structured `RecallResult`; facts/entities empty until Phase 4. **Superseded by walking-skeleton extract:** facts populate after `consolidate`; they remain empty immediately after `remember`.
 
 ### P0-016 — Memory `forget` use case — Phase 1 hide|delete; Phase 6 retract|purge
 

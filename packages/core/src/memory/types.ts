@@ -59,6 +59,7 @@ export interface RecallInput {
   readonly limit?: number;
   readonly maxTokens?: number;
   readonly sessionId?: string;
+  readonly asOf?: string;
 }
 
 export type ForgetMode = 'hide' | 'delete' | 'retract' | 'purge';

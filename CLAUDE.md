@@ -25,6 +25,7 @@ Invoke with `/skill-name` when the skill is installed in this project:
 | `build-and-fix`                | Fix build errors, type errors, compilation failures                         |
 | `check-directory-structure`    | After bulk edits; audit layout; fix flat or misplaced files                 |
 | `codeql-fix`                   | CodeQL database create/analyze and SARIF-driven fixes when CodeQL is set up |
+| `dogfood-web`                  | Playwright e2e then **read** PNGs; fail IDs, postage-stamp map, CSS shout   |
 | `improve-claude-config`        | Evolve `.claude/` configuration                                             |
 | `initialize-project`           | Bootstrap a new repo from this template                                     |
 | `lint-and-fix`                 | Fix lint/format issues via Trunk                                            |

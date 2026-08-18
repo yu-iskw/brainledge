@@ -20,8 +20,9 @@ describe('standalone skeleton e2e', () => {
     const first = await cmdRecall('Where does Alice live?', dataDir);
     expect(first).toMatch(/Tokyo/u);
     expect(await cmdConsolidate(dataDir)).toMatch(/consolidated/u);
-    const second = await cmdRecall('Alice', dataDir);
-    expect(second).toMatch(/Tokyo/u);
+    const second = await cmdRecall('Where does Alice live?', dataDir);
+    expect(second).toMatch(/^Alice lives in Tokyo/u);
+    expect(second).not.toMatch(/ent_/u);
     expect(await cmdForget(episodeId, { dataDirFlag: dataDir, mode: 'hide' })).toMatch(/forgot/u);
     expect(await cmdRecall('Alice', dataDir)).toMatch(/No memories found/u);
   });

@@ -1,4 +1,5 @@
 import type { LaidOutNode } from './graph-layout.js';
+import type { KnowledgeGraphEdge } from './graph-model.js';
 
 export interface GraphCamera {
   scale: number;
@@ -91,6 +92,66 @@ export function hitTestNode(
     if (dist <= bestDist) {
       best = node;
       bestDist = dist;
+    }
+  }
+  return best;
+}
+
+const EDGE_HIT_THRESHOLD = 8;
+
+function distanceToSegment(
+  point: { x: number; y: number },
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) {
+    return Math.hypot(point.x - start.x, point.y - start.y);
+  }
+  const t = Math.max(
+    0,
+    Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq),
+  );
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+}
+
+export function hitTestEdge(
+  nodes: readonly LaidOutNode[],
+  edges: readonly KnowledgeGraphEdge[],
+  camera: GraphCamera,
+  screenX: number,
+  screenY: number,
+): KnowledgeGraphEdge | undefined {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  let best: KnowledgeGraphEdge | undefined;
+  let bestDist = EDGE_HIT_THRESHOLD;
+  for (const edge of edges) {
+    const source = byId.get(edge.sourceId);
+    const target = byId.get(edge.targetId);
+    if (source === undefined || target === undefined) {
+      continue;
+    }
+    const from = worldToScreen(camera, source.x, source.y);
+    const to = worldToScreen(camera, target.x, target.y);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dist = Math.max(1, Math.hypot(dx, dy));
+    const ux = dx / dist;
+    const uy = dy / dist;
+    const startX = from.x + ux * NODE_RADIUS;
+    const startY = from.y + uy * NODE_RADIUS;
+    const endX = to.x - ux * NODE_RADIUS;
+    const endY = to.y - uy * NODE_RADIUS;
+    const toSegment = distanceToSegment(
+      { x: screenX, y: screenY },
+      { x: startX, y: startY },
+      { x: endX, y: endY },
+    );
+    if (toSegment <= bestDist) {
+      best = edge;
+      bestDist = toSegment;
     }
   }
   return best;

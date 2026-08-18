@@ -39,6 +39,7 @@ export interface FactHit {
   readonly subjectId?: string;
   readonly predicateId?: string;
   readonly objectText?: string;
+  readonly sourceEpisodeId?: string;
 }
 
 export interface ProvenanceItem {
@@ -69,6 +70,14 @@ export interface RecallResult {
   readonly memories: readonly MemoryHit[];
   readonly facts: readonly FactHit[];
   readonly provenanceSummary?: readonly ProvenanceItem[];
+}
+
+export interface ProposedFact {
+  readonly subjectId: string;
+  readonly predicateId: string;
+  readonly objectText: string;
+  readonly sourceEpisodeId: string;
+  readonly closes?: string;
 }
 
 export interface IngestionResult {

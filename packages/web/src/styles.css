@@ -238,7 +238,7 @@ ul.data-list .pill {
 .inspect-layout:not([hidden]) {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 22.5rem);
   min-height: calc(100vh - 8.5rem);
 }
 
@@ -617,6 +617,19 @@ ul.data-list li p {
   font-size: 0.8rem;
   gap: 0.4rem;
   margin-left: auto;
+}
+
+.graph-as-of {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.8rem;
+  gap: 0.4rem;
+}
+
+.graph-as-of input {
+  margin: 0;
+  width: 10.5rem;
 }
 
 .graph-search input {

@@ -19,6 +19,7 @@ export interface GraphDrawState {
   readonly edges: readonly KnowledgeGraphEdge[];
   readonly camera: GraphCamera;
   readonly selectedId?: string;
+  readonly selectedEdgeId?: string;
   readonly hoveredId?: string;
   readonly focusIds: ReadonlySet<string>;
 }
@@ -27,15 +28,18 @@ function isActive(id: string, state: GraphDrawState): boolean {
   return state.focusIds.size === 0 || state.focusIds.has(id);
 }
 
-function shouldShowEdgeLabel(state: GraphDrawState, sourceId: string, targetId: string): boolean {
+function shouldShowEdgeLabel(state: GraphDrawState, edge: KnowledgeGraphEdge): boolean {
+  if (state.selectedEdgeId === edge.id) {
+    return true;
+  }
   if (state.edges.length <= 24 || state.camera.scale > 0.55) {
     return true;
   }
   return (
-    state.selectedId === sourceId ||
-    state.selectedId === targetId ||
-    state.hoveredId === sourceId ||
-    state.hoveredId === targetId
+    state.selectedId === edge.sourceId ||
+    state.selectedId === edge.targetId ||
+    state.hoveredId === edge.sourceId ||
+    state.hoveredId === edge.targetId
   );
 }
 
@@ -95,6 +99,16 @@ function drawArrowHead(
   ctx.fill();
 }
 
+function edgeLineWidth(selected: boolean, active: boolean): number {
+  if (selected) {
+    return 2.4;
+  }
+  if (active) {
+    return 1.6;
+  }
+  return 1;
+}
+
 function drawEdges(
   ctx: CanvasRenderingContext2D,
   palette: GraphPalette,
@@ -112,15 +126,16 @@ function drawEdges(
     const to = worldToScreen(state.camera, target.x, target.y);
     const { start, end, angle } = edgeEnds(from, to);
     const active = isActive(source.id, state) && isActive(target.id, state);
+    const selected = edge.id === state.selectedEdgeId;
     ctx.globalAlpha = active ? 1 : 0.18;
-    ctx.strokeStyle = palette.border;
-    ctx.lineWidth = active ? 1.6 : 1;
+    ctx.strokeStyle = selected ? palette.accent : palette.border;
+    ctx.lineWidth = edgeLineWidth(selected, active);
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
     ctx.stroke();
     drawArrowHead(ctx, palette, end, angle);
-    if (shouldShowEdgeLabel(state, source.id, target.id)) {
+    if (shouldShowEdgeLabel(state, edge)) {
       drawEdgeLabel(ctx, palette, state.camera, {
         source,
         target,

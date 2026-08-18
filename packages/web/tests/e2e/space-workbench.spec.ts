@@ -1,9 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const screenshotDir = 'test-results/screenshots';
 
 const REMEMBER_CONTENT = 'Dana works at the cafe.';
 const ALICE_CONTENT = 'Alice moved to Tokyo in July 2026.';
+const ALICE_PARIS = 'Alice moved to Paris in August 2026.';
 const CAROL_CONTENT = 'Carol lives in Paris.';
 const RECALL_QUERY = 'Where does Dana work?';
 const ALICE_QUERY = 'Where does Alice live?';
@@ -11,6 +12,13 @@ const DANA_OR_CAFE = /Dana|cafe/iu;
 const MARKDOWN_NOTE = '# Cafe note\n\nDana prefers the window seat.';
 const TECHNICAL_ID = /ks_|ep_|ent_|ing_|principal_/iu;
 const ISO_INSTANT = /T\d{2}:\d{2}:\d{2}/u;
+
+async function extractAndAccept(page: Page): Promise<void> {
+  await page.locator('#consolidate-button').click();
+  await expect(page.locator('#extract-accept-all')).toBeVisible();
+  await page.locator('#extract-accept-all').click();
+  await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+}
 
 test('space workbench capture, recall receipts, and inspect', async ({ page }) => {
   await page.goto('/');
@@ -89,8 +97,7 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
   await page.locator('#tab-inspect').click();
   await expect(page.locator('#panel-inspect')).toBeVisible();
   await expect(page.locator('#overview-heading')).toHaveText('Inspect');
-  await page.locator('#consolidate-button').click();
-  await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+  await extractAndAccept(page);
   await expect(page.locator('#inspect-dossier')).not.toHaveText(TECHNICAL_ID);
   await expect(page.locator('#graph-list')).not.toHaveText(/livesIn|ent_/u);
   await page.screenshot({
@@ -109,4 +116,34 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
     path: `${screenshotDir}/06-alice-receipts.png`,
     fullPage: true,
   });
+
+  await page.locator('#recall-receipts li').first().click();
+  await expect(page.locator('#overview-heading')).toHaveText('Inspect');
+  await expect(page.locator('#inspect-dossier')).toContainText(/Tokyo/iu);
+
+  await page.locator('#tab-capture').click();
+  await page.locator('#remember-input').fill(ALICE_PARIS);
+  await page.locator('#remember-button').click();
+  await page
+    .locator('#remember-status')
+    .getByText(/^Saved$/u)
+    .waitFor();
+  await page.locator('#tab-inspect').click();
+  await page.locator('#consolidate-button').click();
+  await expect(page.locator('#extract-proposed')).toContainText(/closes Alice lives in Tokyo/iu);
+  await page.locator('#extract-accept-all').click();
+  await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+  await expect(page.locator('#graph-list')).toContainText(/Paris/iu);
+
+  await page.locator('#as-of-input').fill('2026-07-15');
+  await expect(page.locator('#graph-list')).toContainText(/Alice lives in Tokyo/iu);
+  await expect(page.locator('#graph-list')).not.toContainText(/Alice lives in Paris/iu);
+  await page.screenshot({
+    path: `${screenshotDir}/06b-as-of-july.png`,
+    fullPage: true,
+  });
+
+  await page.locator('#tab-recall').click();
+  await expect(page.locator('#recall-output')).toContainText(/Tokyo/iu);
+  await expect(page.locator('#recall-output')).not.toContainText(/Paris/iu);
 });

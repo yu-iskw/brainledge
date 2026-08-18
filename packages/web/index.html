@@ -183,12 +183,16 @@
               <h2 id="graph-heading">Knowledge map</h2>
               <p class="meta">
                 People and places are nodes. Labeled edges are facts. Drag to pan, scroll to zoom,
-                click a node to inspect its source.
+                click a node or edge to inspect.
               </p>
               <div class="graph-toolbar">
                 <button id="graph-zoom-out" class="secondary" type="button">Zoom out</button>
                 <button id="graph-zoom-in" class="secondary" type="button">Zoom in</button>
                 <button id="graph-fit" class="secondary" type="button">Fit</button>
+                <label class="graph-as-of" for="as-of-input"
+                  >As of
+                  <input id="as-of-input" type="date" />
+                </label>
                 <label class="graph-search" for="graph-search"
                   >Find
                   <input
@@ -225,16 +229,31 @@
                 <p class="eyebrow">Dossier</p>
                 <h2>Selected episode</h2>
                 <p class="meta">
-                  World time filters facts. Asserted time is when we captured the note.
+                  World time on the map filters facts. Asserted time is when we captured the note.
                 </p>
-                <label for="as-of-input">As of (world date)</label>
-                <input id="as-of-input" type="date" />
                 <div id="inspect-dossier" class="dossier"></div>
                 <div class="row">
                   <button id="consolidate-button" type="button">Extract facts</button>
-                  <button id="forget-button" class="danger" type="button">Hide episode</button>
+                  <button id="forget-button" type="button">Hide note</button>
+                </div>
+                <div class="row">
+                  <button id="retract-button" class="secondary" type="button">Retract facts</button>
+                  <button id="purge-button" class="danger" type="button">Purge note</button>
                 </div>
                 <p id="inspect-status" class="status" aria-live="polite"></p>
+              </article>
+              <article class="card" id="extract-review-card">
+                <p class="eyebrow">Extract</p>
+                <h2>Proposed facts</h2>
+                <p class="meta">
+                  Review extracted triples before they become the map. Re-extract with nothing new
+                  is success.
+                </p>
+                <ul id="extract-proposed" class="data-list" aria-label="Proposed facts"></ul>
+                <div class="row">
+                  <button id="extract-accept-all" type="button" hidden>Accept all</button>
+                  <button id="extract-skip" class="secondary" type="button" hidden>Skip</button>
+                </div>
               </article>
               <article class="card">
                 <p class="eyebrow">Map</p>

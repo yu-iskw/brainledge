@@ -125,8 +125,11 @@ export function createSqliteFactRepository(database: DatabaseSync): FactReposito
               .prepare(
                 `SELECT * FROM facts
                  WHERE workspace_id = ? AND knowledge_space_id = ?
-                   AND asserted_at <= ?
-                   AND (retracted_at IS NULL OR retracted_at > ?)
+                   AND COALESCE(valid_from, asserted_at) <= ?
+                   AND (
+                     COALESCE(valid_until, retracted_at) IS NULL
+                     OR COALESCE(valid_until, retracted_at) > ?
+                   )
                  ORDER BY asserted_at DESC LIMIT ?`,
               )
               .all(workspaceId, knowledgeSpaceId, asOf, asOf, limit) as unknown as FactRow[]);

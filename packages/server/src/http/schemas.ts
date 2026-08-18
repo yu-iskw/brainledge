@@ -10,6 +10,7 @@ export const rememberBody = z.object({
 export const recallBody = z.object({
   query: z.string(),
   limit: z.number().int().positive().max(100).optional(),
+  asOf: z.string().optional(),
 });
 
 export const ingestBody = z

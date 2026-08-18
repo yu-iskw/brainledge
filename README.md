@@ -31,7 +31,7 @@ pnpm --filter @brainledge/cli exec node dist/main.js serve --data-dir /tmp/brain
 
 HTTP listens on `127.0.0.1:8787` (`GET /` is a remember/recall UI). MCP stdio: `brainledge mcp --data-dir /tmp/brainledge`. Remote CLI calls accept `--token` or `BRAINLEDGE_API_TOKEN`.
 
-Phase 1 recall is lexical + recency over episode text (not extracted facts). Run `brainledge consolidate` (or `POST /api/v1/spaces/ks_default/consolidate`) to extract facts from episode text.
+Phase 1 recall is lexical + recency over episode text, plus fact hits after `brainledge consolidate` (or `POST /api/v1/spaces/ks_default/consolidate`). `remember()` still does not extract.
 
 ### Packages
 

@@ -12,7 +12,7 @@ import type { ForgetInput, RecallInput, RecallResult, RememberInput } from './ty
 import type { Authorizer, ExecutionContext } from '../auth/authorizer.js';
 import type { EpisodeKind } from '../knowledge/episode.js';
 import type { Fact } from '../knowledge/fact.js';
-import type { KnowledgeService } from '../knowledge/knowledge-service.js';
+import type { KnowledgeService, ProposedFact } from '../knowledge/knowledge-service.js';
 import type { EmbeddingProvider } from '../models/providers.js';
 import type { Clock } from '../ports/clock.js';
 import type { EmbeddingStore } from '../ports/embedding-store.js';
@@ -27,8 +27,8 @@ export interface MemoryService {
   forget(context: ExecutionContext, input: ForgetInput): Promise<void>;
   consolidate(
     context: ExecutionContext,
-    input: { spaceId: string },
-  ): Promise<{ factCount: number }>;
+    input: { spaceId: string; dryRun?: boolean },
+  ): Promise<{ factCount: number; proposed?: readonly ProposedFact[] }>;
 }
 
 export function createMemoryService(deps: {
@@ -121,6 +121,7 @@ export function createMemoryService(deps: {
           : await deps.facts.query({
               workspaceId: context.workspaceId,
               knowledgeSpaceId: spaceId,
+              asOf: input.asOf === undefined ? undefined : parseIsoUtc(input.asOf),
               limit,
             });
       const retrieved = retrieve({
@@ -223,7 +224,10 @@ export function createMemoryService(deps: {
 
     async consolidate(context, input) {
       if (deps.knowledge === undefined) {
-        return { factCount: 0 };
+        return input.dryRun === true ? { factCount: 0, proposed: [] } : { factCount: 0 };
+      }
+      if (input.dryRun === true) {
+        return deps.knowledge.previewExtract(context, { spaceId: input.spaceId });
       }
       return deps.knowledge.consolidate(context, input);
     },

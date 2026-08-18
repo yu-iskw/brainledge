@@ -11,7 +11,7 @@ export const DEFAULT_UI_HTML = `<!doctype html>
   </head>
   <body>
     <h1>Brainledge</h1>
-    <p>Standalone space <code>ks_default</code>. Phase 1 recall is lexical over episode text.</p>
+    <p>Standalone space <code>ks_default</code>. Phase 1 recall is lexical over episode text, plus fact hits after consolidate.</p>
     <section>
       <h2>Remember</h2>
       <textarea id="remember-input" rows="4"></textarea>

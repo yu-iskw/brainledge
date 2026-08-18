@@ -9,7 +9,13 @@ import {
 } from '../domain/ids.js';
 import { parseIsoUtc } from '../domain/time.js';
 
-import { assertFactInvariant, deriveFactStatus, factIdentityKey, factObjectKey } from './fact.js';
+import {
+  assertFactInvariant,
+  deriveFactStatus,
+  factIdentityKey,
+  factObjectKey,
+  factVisibleAt,
+} from './fact.js';
 
 import type { Fact } from './fact.js';
 
@@ -69,5 +75,18 @@ describe('fact invariants', () => {
     expect(
       factIdentityKey(asEntityId('ent_alice'), 'livesIn', { kind: 'text', value: 'Tokyo' }),
     ).toBe('ent_alice|livesIn|text:Tokyo');
+  });
+
+  it('uses world validity for as-of when validUntil is set', () => {
+    const july = parseIsoUtc('2026-07-15T23:59:59.000Z');
+    const august = parseIsoUtc('2026-08-15T00:00:00.000Z');
+    const tokyo = sample({
+      validFrom: parseIsoUtc('2026-07-01T00:00:00.000Z'),
+      validUntil: parseIsoUtc('2026-08-01T00:00:00.000Z'),
+      retractedAt: parseIsoUtc('2026-08-18T00:00:00.000Z'),
+      status: 'retracted',
+    });
+    expect(factVisibleAt(tokyo, july)).toBe(true);
+    expect(factVisibleAt(tokyo, august)).toBe(false);
   });
 });

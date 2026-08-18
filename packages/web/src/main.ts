@@ -31,6 +31,7 @@ import type {
   IngestionResult,
   KnowledgeSpace,
   Principal,
+  ProposedFact,
   ProvenanceItem,
   RecallResult,
   Workspace,
@@ -50,8 +51,10 @@ const EMPTY_TIMELINE_TITLE = 'No episodes yet';
 const EMPTY_TIMELINE = 'Captured notes and ingests appear here in order.';
 const EMPTY_FACTS = 'Select an episode and run Extract facts.';
 const EMPTY_RECEIPTS = 'Widen the question or capture more about this topic.';
+const NO_NEW_FACTS = 'No new facts';
 const MEMORY_LIST_ID = 'memory-list';
 const TIMELINE_LIST_ID = 'timeline-list';
+const RECALL_INPUT_ID = 'recall-input';
 const SPACES_CREATE_FORM_ID = 'spaces-create-form';
 const NEW_SPACE_TOGGLE_ID = 'new-space-toggle';
 
@@ -91,6 +94,7 @@ const state: AppState = {
 
 let ingestionPollTimer: ReturnType<typeof setInterval> | undefined;
 let graphView: GraphViewHandle | undefined;
+let lastRecallQuery: string | undefined;
 
 function cssColor(name: string, fallback: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -126,16 +130,20 @@ function ensureGraphView(): GraphViewHandle {
   graphView = bindKnowledgeGraph(
     byId<HTMLCanvasElement>('knowledge-graph'),
     graphPalette(),
-    (node, episodeId) => {
-      if (episodeId !== undefined) {
-        state.selectedEpisodeId = episodeId;
+    (node, edge) => {
+      if (edge?.sourceEpisodeId !== undefined) {
+        state.selectedEpisodeId = edge.sourceEpisodeId;
         renderDossier();
         renderEpisodeList(TIMELINE_LIST_ID, state.timeline, EMPTY_TIMELINE_TITLE, EMPTY_TIMELINE);
       }
       const graph = buildKnowledgeGraph(state.facts, state.entities);
       const counts = graphCountLabel(graph.nodes.length, graph.edges.length);
-      setText('graph-caption', node === undefined ? counts : `${counts} · ${node.label}`);
-      renderGraphInspector(node);
+      const selectedLabel = node?.label ?? edge?.label;
+      setText(
+        'graph-caption',
+        selectedLabel === undefined ? counts : `${counts} · ${selectedLabel}`,
+      );
+      renderGraphInspector(node, edge);
     },
   );
   graphHost().brainledgeGraph = graphView;
@@ -173,9 +181,50 @@ function renderGraphLegend(edges: readonly KnowledgeGraphEdge[]): void {
   facts.textContent = labels.length === 0 ? 'Facts' : labels.slice(0, 4).join(', ');
 }
 
-function renderGraphInspector(node: LaidOutNode | undefined): void {
+function renderEdgeInspector(root: HTMLElement, edge: KnowledgeGraphEdge): void {
+  root.hidden = false;
+  const kind = document.createElement('p');
+  kind.className = 'eyebrow';
+  kind.textContent = 'Fact';
+  const name = document.createElement('h3');
+  const fact = state.facts.find((item) => item.id === edge.factId);
+  name.textContent = fact === undefined ? edge.label : factSentence(fact);
+  const list = document.createElement('ul');
+  list.className = 'data-list';
+  const relation = document.createElement('li');
+  relation.textContent = edge.label;
+  list.append(relation);
+  if (fact !== undefined) {
+    const world = [fact.validFrom, fact.validUntil]
+      .filter((value): value is string => value !== undefined)
+      .map((value) => formatObservedAt(value))
+      .join(' → ');
+    if (world.length > 0) {
+      const window = document.createElement('li');
+      window.className = 'meta';
+      window.textContent = `World: ${world}`;
+      list.append(window);
+    }
+  }
+  const source = [...state.episodes, ...state.timeline].find(
+    (episode) => episode.id === edge.sourceEpisodeId,
+  );
+  if (source !== undefined) {
+    const from = document.createElement('li');
+    from.className = 'meta';
+    from.textContent = formatProvenanceLabel(source.content);
+    list.append(from);
+  }
+  root.append(kind, name, list);
+}
+
+function renderGraphInspector(node: LaidOutNode | undefined, edge?: KnowledgeGraphEdge): void {
   const root = byId<HTMLElement>('graph-inspector');
   root.replaceChildren();
+  if (edge !== undefined) {
+    renderEdgeInspector(root, edge);
+    return;
+  }
   if (node === undefined) {
     root.hidden = true;
     return;
@@ -474,14 +523,12 @@ function renderRecallReceipts(result: RecallResult): void {
   for (const hit of result.facts) {
     const item = document.createElement('li');
     item.textContent = formatRecallFacts([hit]);
-    if (hit.factId !== undefined) {
-      item.addEventListener('click', () => {
-        const fact = state.facts.find((entry) => entry.id === hit.factId);
-        state.selectedEpisodeId = fact?.sourceEpisodeId;
-        activateMode('inspect');
-        renderDossier();
-      });
-    }
+    item.addEventListener('click', () => {
+      state.selectedEpisodeId = hit.sourceEpisodeId;
+      activateMode('inspect');
+      renderDossier();
+      renderEpisodeList(TIMELINE_LIST_ID, state.timeline, EMPTY_TIMELINE_TITLE, EMPTY_TIMELINE);
+    });
     list.append(item);
   }
 }
@@ -563,12 +610,20 @@ async function loadTimeline(): Promise<void> {
   }
 }
 
-function asOfQuery(): string {
+function asOfIso(): string | undefined {
   const value = byId<HTMLInputElement>('as-of-input').value;
   if (value.length === 0) {
+    return undefined;
+  }
+  return `${value}T23:59:59.000Z`;
+}
+
+function asOfQuery(): string {
+  const iso = asOfIso();
+  if (iso === undefined) {
     return '';
   }
-  return `?asOf=${encodeURIComponent(`${value}T23:59:59.000Z`)}`;
+  return `?asOf=${encodeURIComponent(iso)}`;
 }
 
 async function loadFactsAndEntities(): Promise<void> {
@@ -679,13 +734,14 @@ async function remember(): Promise<void> {
 }
 
 async function recall(): Promise<void> {
-  const input = byId<HTMLInputElement>('recall-input');
+  const input = byId<HTMLInputElement>(RECALL_INPUT_ID);
   const output = byId<HTMLElement>('recall-output');
   output.textContent = 'Searching…';
   const result = await safeCall(
     () =>
       apiPost<RecallResult>(spacePath('/recall'), {
         query: input.value,
+        asOf: asOfIso(),
       }),
     {
       onError: (message) => {
@@ -696,6 +752,7 @@ async function recall(): Promise<void> {
   if (!result) {
     return;
   }
+  lastRecallQuery = input.value;
   const memories = result.memories.map((hit) => hit.content).join('\n---\n');
   if (result.facts.length > 0) {
     output.textContent = formatRecallFacts(result.facts);
@@ -813,37 +870,136 @@ async function createSpace(event: SubmitEvent): Promise<void> {
   await selectSpace(result.id);
 }
 
-async function consolidate(): Promise<void> {
+interface ConsolidateResponse {
+  readonly factCount: number;
+  readonly proposed?: readonly ProposedFact[];
+  readonly status?: string;
+}
+
+function renderProposedFacts(proposed: readonly ProposedFact[]): void {
+  const list = byId<HTMLUListElement>('extract-proposed');
+  const accept = byId<HTMLButtonElement>('extract-accept-all');
+  const skip = byId<HTMLButtonElement>('extract-skip');
+  list.replaceChildren();
+  const hasProposed = proposed.length > 0;
+  accept.hidden = !hasProposed;
+  skip.hidden = !hasProposed;
+  if (!hasProposed) {
+    const item = document.createElement('li');
+    item.className = 'meta';
+    item.textContent = NO_NEW_FACTS;
+    list.append(item);
+    return;
+  }
+  for (const fact of proposed) {
+    const item = document.createElement('li');
+    const sentence = formatFactSentence({
+      subjectId: fact.subjectId,
+      predicateId: fact.predicateId,
+      objectText: fact.objectText,
+      summary: `${fact.subjectId} ${fact.predicateId} ${fact.objectText}`,
+    });
+    item.textContent = fact.closes === undefined ? sentence : `${sentence} · closes ${fact.closes}`;
+    list.append(item);
+  }
+}
+
+async function previewExtract(): Promise<void> {
   setStatus(INSPECT_STATUS_ID, 'Extracting facts…');
   const result = await safeCall(
-    () => apiPost<{ factCount: number }>(spacePath('/consolidate'), {}),
+    () => apiPost<ConsolidateResponse>(`${spacePath('/consolidate')}?dryRun=1`, {}),
     { onError: (message) => setStatus(INSPECT_STATUS_ID, message) },
   );
   if (!result) {
     return;
   }
-  setStatus(INSPECT_STATUS_ID, `Extracted ${String(result.factCount)} facts`);
+  const proposed = result.proposed ?? [];
+  renderProposedFacts(proposed);
+  if (proposed.length === 0) {
+    setStatus(INSPECT_STATUS_ID, NO_NEW_FACTS);
+    return;
+  }
+  setStatus(INSPECT_STATUS_ID, `Review ${String(proposed.length)} proposed facts`);
+}
+
+async function acceptExtract(): Promise<void> {
+  setStatus(INSPECT_STATUS_ID, 'Accepting facts…');
+  const result = await safeCall(() => apiPost<ConsolidateResponse>(spacePath('/consolidate'), {}), {
+    onError: (message) => setStatus(INSPECT_STATUS_ID, message),
+  });
+  if (!result) {
+    return;
+  }
+  renderProposedFacts([]);
+  setStatus(
+    INSPECT_STATUS_ID,
+    result.factCount === 0 ? NO_NEW_FACTS : `Extracted ${String(result.factCount)} facts`,
+  );
   await loadSpaceProjections();
 }
 
-async function forgetSelected(): Promise<void> {
+function skipExtract(): void {
+  renderProposedFacts([]);
+  setStatus(INSPECT_STATUS_ID, 'Skipped extraction');
+}
+
+function forgetProgressLabel(mode: 'hide' | 'retract' | 'purge'): string {
+  switch (mode) {
+    case 'hide': {
+      return 'Hiding…';
+    }
+    case 'retract': {
+      return 'Retracting…';
+    }
+    case 'purge': {
+      return 'Purging…';
+    }
+    default: {
+      const exhaustive: never = mode;
+      throw new Error(exhaustive);
+    }
+  }
+}
+
+function forgetDoneLabel(mode: 'hide' | 'retract' | 'purge'): string {
+  switch (mode) {
+    case 'hide': {
+      return 'Note hidden';
+    }
+    case 'retract': {
+      return 'Facts retracted';
+    }
+    case 'purge': {
+      return 'Note purged';
+    }
+    default: {
+      const exhaustive: never = mode;
+      throw new Error(exhaustive);
+    }
+  }
+}
+
+async function forgetSelected(mode: 'hide' | 'retract' | 'purge'): Promise<void> {
   const episodeId = state.selectedEpisodeId;
   if (episodeId === undefined) {
     setStatus(INSPECT_STATUS_ID, 'Select an episode first.');
     return;
   }
-  setStatus(INSPECT_STATUS_ID, 'Hiding…');
+  if (mode === 'purge' && !window.confirm('Permanently remove this note and its facts?')) {
+    return;
+  }
+  setStatus(INSPECT_STATUS_ID, forgetProgressLabel(mode));
   const result = await safeCall(
     () =>
       apiDelete<{ status: string }>(
-        `${spacePath('/memories')}/${encodeURIComponent(episodeId)}?mode=hide`,
+        `${spacePath('/memories')}/${encodeURIComponent(episodeId)}?mode=${mode}`,
       ),
     { onError: (message) => setStatus(INSPECT_STATUS_ID, message) },
   );
   if (!result) {
     return;
   }
-  setStatus(INSPECT_STATUS_ID, 'Episode hidden');
+  setStatus(INSPECT_STATUS_ID, forgetDoneLabel(mode));
   state.selectedEpisodeId = undefined;
   await loadSpaceProjections();
 }
@@ -903,22 +1059,38 @@ function bindEvents(): void {
     form.hidden = !open;
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
-  byId<HTMLInputElement>('recall-input').addEventListener('keydown', (event) => {
+  byId<HTMLInputElement>(RECALL_INPUT_ID).addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       void recall();
     }
   });
   byId<HTMLButtonElement>('consolidate-button').addEventListener('click', () => {
-    void consolidate();
+    void previewExtract();
+  });
+  byId<HTMLButtonElement>('extract-accept-all').addEventListener('click', () => {
+    void acceptExtract();
+  });
+  byId<HTMLButtonElement>('extract-skip').addEventListener('click', () => {
+    skipExtract();
   });
   byId<HTMLButtonElement>('forget-button').addEventListener('click', () => {
-    void forgetSelected();
+    void forgetSelected('hide');
+  });
+  byId<HTMLButtonElement>('retract-button').addEventListener('click', () => {
+    void forgetSelected('retract');
+  });
+  byId<HTMLButtonElement>('purge-button').addEventListener('click', () => {
+    void forgetSelected('purge');
   });
   byId<HTMLInputElement>('as-of-input').addEventListener('change', () => {
-    void loadFactsAndEntities().then(() => {
+    void loadFactsAndEntities().then(async () => {
       renderGraph();
       renderDossier();
       renderOverview();
+      if (lastRecallQuery !== undefined && lastRecallQuery.length > 0) {
+        byId<HTMLInputElement>(RECALL_INPUT_ID).value = lastRecallQuery;
+        await recall();
+      }
     });
   });
 }

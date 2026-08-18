@@ -181,6 +181,13 @@ async function rememberNotes(page: Page, notes: readonly string[]): Promise<void
   }
 }
 
+async function extractAndAccept(page: Page): Promise<void> {
+  await page.locator('#consolidate-button').click();
+  await expect(page.locator('#extract-accept-all')).toBeVisible();
+  await page.locator('#extract-accept-all').click();
+  await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+}
+
 test.describe.configure({ mode: 'serial' });
 
 for (const scenario of SCENARIOS) {
@@ -201,8 +208,7 @@ for (const scenario of SCENARIOS) {
 
     await page.locator('#tab-inspect').click();
     await expect(page.locator('#overview-heading')).toHaveText('Inspect');
-    await page.locator('#consolidate-button').click();
-    await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+    await extractAndAccept(page);
     await expect(page.locator('#graph-list')).toHaveText(scenario.expectGraph);
     await expect(page.locator('#graph-list')).not.toHaveText(TECHNICAL_ID);
     await expect(page.locator('.graph-legend')).toBeVisible();

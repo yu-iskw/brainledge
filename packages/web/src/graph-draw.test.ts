@@ -33,10 +33,14 @@ function recordingContext(): {
   calls: string[];
   fillRectStyles: string[];
   fillTexts: string[];
+  strokeStyles: string[];
+  strokeWidths: number[];
 } {
   const calls: string[] = [];
   const fillRectStyles: string[] = [];
   const fillTexts: string[] = [];
+  const strokeStyles: string[] = [];
+  const strokeWidths: number[] = [];
   const ctx = {
     globalAlpha: 1,
     fillStyle: '',
@@ -64,6 +68,8 @@ function recordingContext(): {
     },
     stroke() {
       calls.push('stroke');
+      strokeStyles.push(String(ctx.strokeStyle));
+      strokeWidths.push(ctx.lineWidth);
     },
     moveTo() {
       calls.push('moveTo');
@@ -95,7 +101,14 @@ function recordingContext(): {
       calls.push('closePath');
     },
   };
-  return { ctx: ctx as CanvasRenderingContext2D, calls, fillRectStyles, fillTexts };
+  return {
+    ctx: ctx as CanvasRenderingContext2D,
+    calls,
+    fillRectStyles,
+    fillTexts,
+    strokeStyles,
+    strokeWidths,
+  };
 }
 
 function drawState(overrides: Partial<GraphDrawState> = {}): GraphDrawState {
@@ -135,6 +148,20 @@ describe('drawKnowledgeGraph', () => {
     const { ctx, calls } = recordingContext();
     drawKnowledgeGraph(ctx, 640, 400, palette, drawState({ nodes: [alice], selectedId: alice.id }));
     expect(calls).toContain('stroke');
+  });
+
+  it('strokes the selected edge with accent and keeps the label', () => {
+    const { ctx, fillTexts, strokeStyles, strokeWidths } = recordingContext();
+    drawKnowledgeGraph(
+      ctx,
+      640,
+      400,
+      palette,
+      drawState({ nodes: [alice, tokyo], edges: [livesIn], selectedEdgeId: livesIn.id }),
+    );
+    expect(strokeStyles).toContain(palette.accent);
+    expect(strokeWidths).toContain(2.4);
+    expect(fillTexts).toContain(livesIn.label);
   });
 
   it('skips edges whose endpoints are missing', () => {

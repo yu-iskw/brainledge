@@ -78,3 +78,9 @@ export function factIdentityKey(
 ): string {
   return `${subjectPredicateKey(subject, predicateId)}|${factObjectKey(object)}`;
 }
+
+export function factVisibleAt(fact: Fact, asOf: IsoUtcTimestamp): boolean {
+  const from = fact.validFrom ?? fact.assertedAt;
+  const until = fact.validUntil ?? fact.retractedAt;
+  return from <= asOf && (until === undefined || until > asOf);
+}

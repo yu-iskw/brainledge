@@ -179,6 +179,7 @@ function registerMemoryRoutes(app: Hono, application: Application): void {
       spaceId: context.req.param('spaceId'),
       query: parsed.data.query,
       limit: parsed.data.limit,
+      asOf: parsed.data.asOf,
     });
     return context.json({ ...result, requestId: id });
   });
@@ -186,10 +187,12 @@ function registerMemoryRoutes(app: Hono, application: Application): void {
   app.post('/api/v1/spaces/:spaceId/consolidate', async (context) => {
     const id = requestId(context.req.header(REQUEST_ID_HEADER));
     const spaceId = context.req.param('spaceId');
-    const result = await application.memory.consolidate(localContext(), { spaceId });
+    const dryRun = context.req.query('dryRun') === '1';
+    const result = await application.memory.consolidate(localContext(), { spaceId, dryRun });
     return context.json({
-      status: 'completed',
+      status: dryRun ? 'preview' : 'completed',
       factCount: result.factCount,
+      ...(result.proposed === undefined ? {} : { proposed: result.proposed }),
       requestId: id,
     });
   });

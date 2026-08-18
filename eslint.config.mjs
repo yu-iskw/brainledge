@@ -18,6 +18,18 @@ const tsParserOptions = {
 const securityRecommended = security.configs.recommended;
 
 /**
+ * eslint-plugin-security recommended plus overrides for Node CLI/storage.
+ * `detect-non-literal-fs-filename` and `detect-object-injection` flag ordinary
+ * path arguments and Map/object lookups as medium; Trunk fails PRs on new mediums.
+ * Supply-chain scanning stays in Trivy/OSV (`pnpm lint:security`).
+ */
+const securityRules = {
+  ...securityRecommended.rules,
+  'security/detect-non-literal-fs-filename': 'off',
+  'security/detect-object-injection': 'off',
+};
+
+/**
  * import-x recommended + typescript resolver (uses `projectService` from parser; eslint-import-resolver-typescript installed for resolution).
  * Prettier stays canonical via Trunk — no @stylistic rules here.
  */
@@ -131,7 +143,7 @@ export default [
     settings: importXSettings,
     rules: {
       ...importXRules,
-      ...securityRecommended.rules,
+      ...securityRules,
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-new-func': 'error',
@@ -160,7 +172,7 @@ export default [
     settings: importXSettings,
     rules: {
       ...importXRules,
-      ...securityRecommended.rules,
+      ...securityRules,
       ...sharedTsRules,
       '@typescript-eslint/no-unused-private-class-members': 'error',
       'unicorn/filename-case': unicornFilenameCase,
@@ -188,7 +200,7 @@ export default [
     settings: importXSettings,
     rules: {
       ...importXRules,
-      ...securityRecommended.rules,
+      ...securityRules,
       ...sharedTsRules,
       ...vitestPlugin.configs.recommended.rules,
       // Tests often repeat string literals and use conditional expects; keep signal without noise.
@@ -219,7 +231,7 @@ export default [
       ...securityRecommended.plugins,
     },
     rules: {
-      ...securityRecommended.rules,
+      ...securityRules,
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },

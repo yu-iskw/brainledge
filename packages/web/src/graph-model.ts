@@ -17,7 +17,7 @@ export interface KnowledgeGraphEdge {
   readonly sourceEpisodeId?: string;
 }
 
-export interface KnowledgeGraph {
+interface KnowledgeGraph {
   readonly nodes: readonly KnowledgeGraphNode[];
   readonly edges: readonly KnowledgeGraphEdge[];
 }

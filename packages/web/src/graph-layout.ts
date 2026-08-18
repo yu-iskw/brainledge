@@ -5,7 +5,7 @@ export interface LaidOutNode extends KnowledgeGraphNode {
   y: number;
 }
 
-export function hashString(value: string): number {
+function hashString(value: string): number {
   let hash = 2166136261;
   for (const char of value) {
     hash ^= char.codePointAt(0) ?? 0;

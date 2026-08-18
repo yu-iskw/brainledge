@@ -1,8 +1,8 @@
 import { modeHeading } from './display.js';
 
-export const WORKBENCH_MODES = ['capture', 'recall', 'inspect'] as const;
+const WORKBENCH_MODES = ['capture', 'recall', 'inspect'] as const;
 
-export type WorkbenchMode = (typeof WORKBENCH_MODES)[number];
+type WorkbenchMode = (typeof WORKBENCH_MODES)[number];
 
 export function isWorkbenchMode(value: string): value is WorkbenchMode {
   return (WORKBENCH_MODES as readonly string[]).includes(value);

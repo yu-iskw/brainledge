@@ -110,3 +110,4 @@ When you want durable fixes (not one-off chat advice):
 - Do not install Trunk-managed linters globally; versions live in `.trunk/trunk.yaml`
 - Commit **`pnpm-lock.yaml`**
 - After `pnpm install`, Trunk is under `node_modules/.bin`; pin is in `.trunk/trunk.yaml` (`cli.version`). Run `pnpm exec trunk install` if formatters/linters are missing
+- **Dogfood compiled CLI:** `package.json` `exports` point at `dist`. Vitest aliases `src`. After changing runtime code, run `pnpm build` and `node packages/cli/dist/main.js`, not only Vitest.

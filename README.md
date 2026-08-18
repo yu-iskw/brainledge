@@ -26,9 +26,12 @@ pnpm test
 pnpm --filter @brainledge/cli exec node dist/main.js init --data-dir /tmp/brainledge
 pnpm --filter @brainledge/cli exec node dist/main.js remember --data-dir /tmp/brainledge "Alice moved to Tokyo in July 2026."
 pnpm --filter @brainledge/cli exec node dist/main.js recall --data-dir /tmp/brainledge "Where does Alice live?"
+pnpm --filter @brainledge/cli exec node dist/main.js serve --data-dir /tmp/brainledge
 ```
 
-Phase 1 recall is lexical + recency over episode text (not extracted facts). Extraction runs via `memory.consolidate`.
+HTTP listens on `127.0.0.1:8787` (`GET /` is a remember/recall UI). MCP stdio: `brainledge mcp --data-dir /tmp/brainledge`. Remote CLI calls accept `--token` or `BRAINLEDGE_API_TOKEN`.
+
+Phase 1 recall is lexical + recency over episode text (not extracted facts). Run `brainledge consolidate` (or `POST /api/v1/spaces/ks_default/consolidate`) to extract facts from episode text.
 
 ### Packages
 
@@ -54,4 +57,4 @@ pnpm build
 
 ## Enterprise path
 
-`compose.yaml` runs Postgres + API + worker (`APP_PROFILE=enterprise`). Optional `--profile auth` and `--profile object-storage`. See `docs/deploy/gcp.md` and `docs/deploy/aws.md`.
+`compose.yaml` runs a shared SQLite data volume for API + worker (walking skeleton). Postgres is provisioned for later enterprise work; the API does not use `DATABASE_URL` yet. Optional `--profile auth` and `--profile object-storage`. See `docs/deploy/gcp.md` and `docs/deploy/aws.md`.

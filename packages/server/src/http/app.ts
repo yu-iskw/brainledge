@@ -19,6 +19,8 @@ import { MCP_PROTOCOL_VERSION, toMcpV2Request } from '../mcp/protocol.js';
 import { createBrainledgeMcpHandler } from '../mcp/server.js';
 import { formatRequestLog } from '../observability/log.js';
 
+import { DEFAULT_UI_HTML } from './default-ui.js';
+
 interface ErrorBody {
   error: { code: string; message: string; requestId: string };
 }
@@ -63,8 +65,8 @@ export const openApiDocument = {
     '/api/v1/openapi.json': { get: { responses: { '200': { description: 'openapi' } } } },
     '/api/v1/me': { get: { responses: { '200': { description: 'principal' } } } },
     '/api/v1/spaces': { get: { responses: { '200': { description: 'spaces' } } } },
-    '/api/v1/spaces/{spaceId}/memories': {
-      post: { responses: { '200': { description: 'remember' } } },
+    '/api/v1/spaces/{spaceId}/memories/{memoryId}': {
+      delete: { responses: { '200': { description: 'forget' } } },
     },
     '/api/v1/spaces/{spaceId}/recall': {
       post: { responses: { '200': { description: 'recall' } } },
@@ -98,8 +100,10 @@ export const openApiDocument = {
 export const REQUIRED_OPENAPI_PATHS = Object.keys(openApiDocument.paths);
 
 const REQUEST_ID_HEADER = 'x-request-id';
-const PLACEHOLDER_UI_HTML =
-  '<!doctype html><html><head><title>Brainledge</title></head><body><p>Brainledge UI is not bundled in this build.</p></body></html>';
+
+const forgetQuery = z.object({
+  mode: z.enum(['hide', 'delete', 'retract', 'purge']).optional(),
+});
 
 function requestId(header?: string): string {
   return header && header.length > 0 ? header : `req_${Date.now()}`;
@@ -166,7 +170,7 @@ export function createHttpApp(application: Application, options?: CreateHttpAppO
   app.get('/health', (context) => context.json({ status: 'ok' }));
 
   app.get('/', (context) => {
-    const html = options?.uiHtml ?? PLACEHOLDER_UI_HTML;
+    const html = options?.uiHtml ?? DEFAULT_UI_HTML;
     return context.html(html);
   });
 
@@ -223,6 +227,23 @@ export function createHttpApp(application: Application, options?: CreateHttpAppO
     return context.json({ episodeId: result.episodeId, requestId: id });
   });
 
+  app.delete('/api/v1/spaces/:spaceId/memories/:memoryId', async (context) => {
+    const id = requestId(context.req.header(REQUEST_ID_HEADER));
+    const parsed = forgetQuery.safeParse({ mode: context.req.query('mode') });
+    if (!parsed.success) {
+      return context.json(
+        errorBody('INVALID_QUERY', 'mode must be hide|delete|retract|purge', id),
+        400,
+      );
+    }
+    await application.memory.forget(localContext(), {
+      spaceId: context.req.param('spaceId'),
+      memoryId: context.req.param('memoryId'),
+      mode: parsed.data.mode ?? 'hide',
+    });
+    return context.json({ status: 'ok', requestId: id });
+  });
+
   app.post('/api/v1/spaces/:spaceId/recall', async (context) => {
     const id = requestId(context.req.header(REQUEST_ID_HEADER));
     const parsed = recallBody.safeParse(await context.req.json());
@@ -274,8 +295,12 @@ export function createHttpApp(application: Application, options?: CreateHttpAppO
   app.post('/api/v1/spaces/:spaceId/consolidate', async (context) => {
     const id = requestId(context.req.header(REQUEST_ID_HEADER));
     const spaceId = context.req.param('spaceId');
-    const jobId = await enqueueJob(application, 'consolidate', { spaceId });
-    return context.json({ status: 'queued', jobId, requestId: id });
+    const result = await application.memory.consolidate(localContext(), { spaceId });
+    return context.json({
+      status: 'completed',
+      factCount: result.factCount,
+      requestId: id,
+    });
   });
 
   app.get('/api/v1/spaces/:spaceId/entities', async (context) => {
@@ -310,7 +335,13 @@ export function createHttpApp(application: Application, options?: CreateHttpAppO
     });
     return context.json({ items: recalled.provenanceSummary });
   });
-  app.get('/api/v1/spaces/:spaceId/decisions', (context) => context.json({ items: [] }));
+  app.get('/api/v1/spaces/:spaceId/decisions', (context) => {
+    const id = requestId(context.req.header(REQUEST_ID_HEADER));
+    return context.json(
+      errorBody('NOT_IMPLEMENTED', 'Decisions API is not available in the walking skeleton', id),
+      501,
+    );
+  });
   app.get('/api/v1/spaces/:spaceId/export', async (context) => {
     const spaceId = context.req.param('spaceId');
     const recalled = await application.memory.recall(localContext(), {
@@ -320,9 +351,17 @@ export function createHttpApp(application: Application, options?: CreateHttpAppO
     });
     return context.json({ schemaVersion: 1, spaceId, memories: recalled.memories });
   });
-  app.get('/api/v1/ingestions/:runId', (context) =>
-    context.json({ id: context.req.param('runId'), status: 'succeeded' }),
-  );
+  app.get('/api/v1/ingestions/:runId', (context) => {
+    const id = requestId(context.req.header(REQUEST_ID_HEADER));
+    return context.json(
+      errorBody(
+        'NOT_IMPLEMENTED',
+        `Ingestion run status is not tracked yet (id ${context.req.param('runId')})`,
+        id,
+      ),
+      501,
+    );
+  });
 
   app.get('/mcp', (context) =>
     context.json({

@@ -66,9 +66,9 @@ describe('http app', () => {
     expect((await app.request('/api/v1/spaces/ks_default/facts')).status).toBe(200);
     expect((await app.request('/api/v1/spaces/ks_default/timeline')).status).toBe(200);
     expect((await app.request('/api/v1/spaces/ks_default/provenance')).status).toBe(200);
-    expect((await app.request('/api/v1/spaces/ks_default/decisions')).status).toBe(200);
+    expect((await app.request('/api/v1/spaces/ks_default/decisions')).status).toBe(501);
     expect((await app.request('/api/v1/spaces/ks_default/export')).status).toBe(200);
-    expect((await app.request('/api/v1/ingestions/run_1')).status).toBe(200);
+    expect((await app.request('/api/v1/ingestions/run_1')).status).toBe(501);
     expect(
       (
         await app.request('/api/v1/spaces/ks_default/ingestions', {
@@ -81,6 +81,17 @@ describe('http app', () => {
     expect(
       (await app.request('/api/v1/spaces/ks_default/consolidate', { method: 'POST' })).status,
     ).toBe(200);
+    const remembered = await app.request('/api/v1/spaces/ks_default/memories', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: 'temporary note' }),
+    });
+    const rememberedBody = (await remembered.json()) as { episodeId: string };
+    const forgotten = await app.request(
+      `/api/v1/spaces/ks_default/memories/${rememberedBody.episodeId}`,
+      { method: 'DELETE' },
+    );
+    expect(forgotten.status).toBe(200);
   });
 
   it('requires API token on /api/v1 when configured', async () => {
@@ -159,12 +170,12 @@ describe('http app', () => {
     expect(await response.text()).toContain('Custom UI');
   });
 
-  it('returns placeholder UI when uiHtml is omitted', async () => {
+  it('returns the default remember/recall UI when uiHtml is omitted', async () => {
     const application = createTestApplication();
     const app = createHttpApp(application);
     const response = await app.request('/');
     expect(response.status).toBe(200);
-    expect(await response.text()).toMatch(/Brainledge UI/u);
+    expect(await response.text()).toMatch(/Remember/u);
   });
 
   it('maps oversized payloads to 413 and internal errors to 500', async () => {

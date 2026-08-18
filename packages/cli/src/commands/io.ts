@@ -1,8 +1,14 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { createInterface } from 'node:readline';
 
 import { LOCAL_SPACE_ID, localContext, type Application } from '@brainledge/core';
-import { handleMcpJsonRpc } from '@brainledge/server';
+import {
+  handleMcpJsonRpc,
+  parseMcpProfiles,
+  runStandaloneWorker,
+  startStandaloneHttpServer,
+} from '@brainledge/server';
 import { openStandalone, SCHEMA_VERSION } from '@brainledge/storage';
 
 import { initDataDir, resolveDataDir } from '../data-dir.js';
@@ -61,7 +67,7 @@ export async function cmdMigrate(
   const archive = path.join(toDir, 'migrate-export.json');
   await cmdExport(archive, fromDir);
   const count = await cmdImport(archive, toDir);
-  return `migrated ${count} memories sqlite→postgres-compatible archive`;
+  return `migrated ${String(count)} memories between SQLite data directories`;
 }
 
 export function cmdMigrateHelp(): string {
@@ -74,17 +80,33 @@ export function assertMigrateConsent(flags: readonly string[]): void {
   }
 }
 
-export function cmdServe(dataDirFlag?: string, remote?: string): string {
+export function describeServeMode(dataDirFlag?: string, remote?: string): string {
   if (remote !== undefined && remote.length > 0) {
     return `remote:${remote}`;
   }
   const dataDir = resolveDataDir(dataDirFlag);
   mkdirSync(dataDir, { recursive: true });
-  return `in-process:${dataDir}`;
+  return `local:${dataDir}`;
+}
+
+export function cmdServe(dataDirFlag?: string, remote?: string): void {
+  if (remote !== undefined && remote.length > 0) {
+    throw new Error(
+      `serve starts a local HTTP listener. To talk to ${remote}, pass --server to remember/recall instead.`,
+    );
+  }
+  const dataDir = resolveDataDir(dataDirFlag);
+  initDataDir(dataDir);
+  process.env.BRAINLEDGE_DATA_DIR = dataDir;
+  startStandaloneHttpServer(dataDir);
 }
 
 export async function runMcpStdio(application: Application, input: string): Promise<string> {
-  return handleMcpJsonRpc(application, ['memory-read', 'memory-write'], input);
+  return handleMcpJsonRpc(
+    application,
+    parseMcpProfiles(process.env.BRAINLEDGE_MCP_PROFILES),
+    input,
+  );
 }
 
 export async function cmdMcp(dataDirFlag?: string, jsonRpcLine?: string): Promise<string> {
@@ -92,12 +114,39 @@ export async function cmdMcp(dataDirFlag?: string, jsonRpcLine?: string): Promis
   if (!existsSync(path.join(dataDir, 'database.sqlite'))) {
     throw new Error('Run brainledge init first');
   }
-  if (jsonRpcLine === undefined || jsonRpcLine.length === 0) {
-    return 'mcp-stdio-ready';
+  const handle = openStandalone(dataDir);
+  if (jsonRpcLine !== undefined && jsonRpcLine.length > 0) {
+    try {
+      return await runMcpStdio(handle.application, jsonRpcLine);
+    } finally {
+      handle.close();
+    }
+  }
+  const rl = createInterface({ input: process.stdin, terminal: false });
+  try {
+    for await (const line of rl) {
+      if (line.trim().length === 0) {
+        continue;
+      }
+      const response = await runMcpStdio(handle.application, line);
+      process.stdout.write(`${response}\n`);
+    }
+  } finally {
+    handle.close();
+    rl.close();
+  }
+  return '';
+}
+
+export async function cmdWorker(dataDirFlag?: string): Promise<string> {
+  const dataDir = resolveDataDir(dataDirFlag);
+  if (!existsSync(path.join(dataDir, 'database.sqlite'))) {
+    throw new Error('Run brainledge init first');
   }
   const handle = openStandalone(dataDir);
   try {
-    return await runMcpStdio(handle.application, jsonRpcLine);
+    const processed = await runStandaloneWorker(handle.application, { once: true });
+    return `worker processed ${String(processed)} jobs`;
   } finally {
     handle.close();
   }

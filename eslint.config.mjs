@@ -126,7 +126,7 @@ export default [
     ],
   },
   {
-    files: ['packages/**/*.config.ts'],
+    files: ['packages/**/*.config.ts', 'vitest.workspace-aliases.ts'],
     ignores: ['**/dist/**'],
     languageOptions: {
       parser: tsparser,

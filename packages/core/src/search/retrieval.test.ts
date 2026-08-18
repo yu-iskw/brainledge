@@ -39,9 +39,11 @@ describe('retrieval helpers', () => {
       },
     ];
     expect(graphNeighbors(facts, 'alice')[0]?.to).toBe('Tokyo');
-    expect(retrieve({ query: '', episodes: [], facts, strategy: 'recent' }).strategy).toBe(
-      'recent',
-    );
+    expect(retrieve({ query: '', episodes: [], facts, strategy: 'recent' }).factIds).toEqual([
+      'f1',
+    ]);
+    expect(retrieve({ query: 'Bob', episodes: [], facts }).factIds).toEqual([]);
+    expect(retrieve({ query: 'Tokyo', episodes: [], facts }).factIds).toEqual(['f1']);
     expect(documentedCosineLimits().hard).toBeGreaterThan(documentedCosineLimits().soft);
   });
 });

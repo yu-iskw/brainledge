@@ -1,8 +1,8 @@
 {
-  "name": "typescript-template",
+  "name": "brainledge",
   "version": "1.0.0",
   "private": true,
-  "description": "",
+  "description": "Standalone-first context, memory, and knowledge platform.",
   "keywords": [],
   "license": "Apache-2.0",
   "author": "",

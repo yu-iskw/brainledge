@@ -14,9 +14,14 @@ services:
       - packages/server/dist/main.js
       - api
     environment:
-      APP_PROFILE: enterprise
-      DATABASE_URL: postgres://brainledge:brainledge@postgres:5432/brainledge
-      BRAINLEDGE_HOST: 127.0.0.1
+      APP_PROFILE: standalone
+      BRAINLEDGE_DATA_DIR: /data
+      BRAINLEDGE_HOST: 0.0.0.0
+      BRAINLEDGE_UNSAFE_BIND: '1'
+    volumes:
+      - brainledge-data:/data
+    ports:
+      - 8787:8787
     depends_on:
       - postgres
   worker:
@@ -26,8 +31,10 @@ services:
       - packages/server/dist/main.js
       - worker
     environment:
-      APP_PROFILE: enterprise
-      DATABASE_URL: postgres://brainledge:brainledge@postgres:5432/brainledge
+      APP_PROFILE: standalone
+      BRAINLEDGE_DATA_DIR: /data
+    volumes:
+      - brainledge-data:/data
     depends_on:
       - postgres
   oidc:
@@ -44,3 +51,6 @@ services:
     command:
       - server
       - /data
+
+volumes:
+  brainledge-data:

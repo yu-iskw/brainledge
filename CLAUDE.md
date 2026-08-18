@@ -39,3 +39,7 @@ Invoke with `/skill-name` when the skill is installed in this project:
 ## Instruction maintenance
 
 For **when** to capture learnings, **how** to classify improvements, and **where** to edit shared vs Claude-only files, see **`AGENTS.md`** (**Session closure and postmortems**, **Improving agent behavior**). To change **`.claude/`** from Claude Code, use **`/improve-claude-config`**.
+
+## Recent learnings
+
+- 2026-08-18: Workspace `exports` must target `dist` so `node packages/*/dist/*.js` works; Vitest keeps `src` via aliases. Always dogfood the compiled CLI, not only Vitest.

@@ -12,6 +12,7 @@ import {
   cmdMcp,
   cmdMigrateHelp,
   cmdMigrate,
+  describeServeMode,
 } from '../../src/commands/io.js';
 import { cmdInit, cmdRemember, cmdRecall } from '../../src/commands/memory.js';
 
@@ -29,9 +30,9 @@ describe('import export migrate', () => {
     const parsed = JSON.parse(readFileSync(archive, 'utf8')) as { schemaVersion: number };
     expect(parsed.schemaVersion).toBe(1);
     expect(() => assertMigrateConsent([])).toThrow(/i-understand/u);
-    expect(cmdServe(dataDir, 'http://127.0.0.1:8787')).toMatch(/^remote:/u);
-    expect(cmdServe(dataDir)).toMatch(/^in-process:/u);
-    expect(await cmdMcp(dataDir)).toMatch(/mcp-stdio-ready/u);
+    expect(describeServeMode(dataDir, 'http://127.0.0.1:8787')).toMatch(/^remote:/u);
+    expect(describeServeMode(dataDir)).toMatch(/^local:/u);
+    expect(() => cmdServe(dataDir, 'http://127.0.0.1:8787')).toThrow(/local HTTP listener/u);
     expect(cmdMigrateHelp()).toMatch(/migrate/u);
     const migratedDir = mkdtempSync(path.join(os.tmpdir(), 'brainledge-mig-'));
     expect(await cmdMigrate(dataDir, migratedDir, ['--i-understand'])).toMatch(/migrated/u);
@@ -82,6 +83,7 @@ describe('import export migrate', () => {
         new Response(
           JSON.stringify({
             memories: [{ content: 'Alice moved to Tokyo in July 2026.' }],
+            facts: [],
           }),
           { status: 200 },
         ),
@@ -99,5 +101,26 @@ describe('import export migrate', () => {
     const recalled = await cmdRecall('Alice', undefined, serverUrl, fetchImpl);
     expect(recalled).toMatch(/Tokyo/u);
     expect(calls[1].url).toBe(`${serverUrl}/api/v1/spaces/ks_default/recall`);
+  });
+
+  it('sends Bearer token for remote remember/recall', async () => {
+    const headersSeen: string[] = [];
+    const fetchImpl = (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const headerBag = new Headers(init?.headers);
+      headersSeen.push(headerBag.get('authorization') ?? '');
+      const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
+      if (urlStr.endsWith('/memories')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ episodeId: 'ep_remote_1' }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ memories: [], facts: [] }), { status: 200 }),
+      );
+    };
+    await cmdRemember('note', undefined, 'http://127.0.0.1:8787', fetchImpl, 'secret-token');
+    expect(headersSeen[0]).toBe('Bearer secret-token');
+    await cmdRecall('note', undefined, 'http://127.0.0.1:8787', fetchImpl, 'secret-token');
+    expect(headersSeen[1]).toBe('Bearer secret-token');
   });
 });

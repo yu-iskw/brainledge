@@ -1,4 +1,4 @@
-import { mkdtempSync, existsSync } from 'node:fs';
+import { mkdtempSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -20,9 +20,13 @@ describe('status doctor backup', () => {
     const archive = path.join(dataDir, 'backup.sqlite.gz');
     await cmdBackup(archive, dataDir);
     expect(existsSync(`${archive}.config.json`)).toBe(true);
+    mkdirSync(path.join(dataDir, 'blobs'), { recursive: true });
+    writeFileSync(path.join(dataDir, 'blobs', 'note.txt'), 'blob-bytes');
+    await cmdBackup(archive, dataDir);
     const restored = mkdtempSync(path.join(os.tmpdir(), 'brainledge-rst-'));
     await cmdRestore(archive, restored);
     expect(existsSync(path.join(restored, 'config.json'))).toBe(true);
+    expect(existsSync(path.join(restored, 'blobs', 'note.txt'))).toBe(true);
     const recalled = await cmdRecall('Alice', restored);
     expect(recalled).toMatch(/Tokyo/u);
     expect(backupManifest().schemaVersion).toBe(1);

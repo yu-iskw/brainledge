@@ -34,6 +34,10 @@ export async function cmdRestore(source: string, dataDirFlag?: string): Promise<
   if (existsSync(configBackup)) {
     cpSync(configBackup, path.join(dataDir, 'config.json'));
   }
+  const blobsBackup = `${source}.blobs`;
+  if (existsSync(blobsBackup)) {
+    cpSync(blobsBackup, path.join(dataDir, 'blobs'), { recursive: true });
+  }
 }
 
 export function backupManifest(): { schemaVersion: number; profile: string } {

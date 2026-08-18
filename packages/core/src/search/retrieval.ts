@@ -25,9 +25,9 @@ interface RetrievalOutput {
 
 export function retrieve(input: RetrievalInput): RetrievalOutput {
   const strategy = input.strategy ?? inferStrategy(input.query);
+  const tokens = lexicalTokens(input.query);
   let episodes = [...input.episodes];
   if (strategy === 'lexical') {
-    const tokens = lexicalTokens(input.query);
     episodes = episodes.filter((episode) =>
       tokens.some((token) => episode.content.toLowerCase().includes(token)),
     );
@@ -52,12 +52,27 @@ export function retrieve(input: RetrievalInput): RetrievalOutput {
   );
   const kept = new Set(trimmed.kept);
   const keptEpisodes = episodes.filter((episode) => kept.has(episode.content));
+  const keptFacts =
+    strategy === 'recent' || tokens.length === 0
+      ? input.facts
+      : input.facts.filter((fact) => factMatchesQuery(fact, tokens));
   return {
     strategy,
     omitted: trimmed.omitted,
     episodeIds: keptEpisodes.map((episode) => episode.id),
-    factIds: input.facts.slice(0, 20).map((fact) => fact.id),
+    factIds: keptFacts.slice(0, 20).map((fact) => fact.id),
   };
+}
+
+function factMatchesQuery(fact: Fact, tokens: readonly string[]): boolean {
+  const haystack = [
+    fact.subject.entityId,
+    fact.predicate.id,
+    fact.object.kind === 'entity' ? fact.object.entity.entityId : String(fact.object.value),
+  ]
+    .join(' ')
+    .toLowerCase();
+  return tokens.some((token) => haystack.includes(token));
 }
 
 function inferStrategy(query: string): RetrievalStrategy {

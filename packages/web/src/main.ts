@@ -23,7 +23,21 @@ async function recall(): Promise<void> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ query: input.value }),
   });
-  output.textContent = await response.text();
+  const payload = (await response.json()) as {
+    memories?: { content: string }[];
+    facts?: { summary: string }[];
+    error?: { message: string };
+  };
+  if (!response.ok) {
+    output.textContent = payload.error?.message ?? 'Recall failed';
+    return;
+  }
+  const memories = (payload.memories ?? []).map((hit) => hit.content).join('\n---\n');
+  const facts = (payload.facts ?? []).map((hit) => hit.summary).join('\n');
+  output.textContent = memories.length > 0 ? memories : 'No memories found.';
+  if (facts.length > 0) {
+    output.textContent += `\n\nFacts:\n${facts}`;
+  }
 }
 
 document.querySelector('#remember-button')?.addEventListener('click', () => {

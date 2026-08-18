@@ -1,62 +1,57 @@
-# {PROJECT_NAME}
+# Brainledge
 
-{PROJECT_DESCRIPTION}
+Standalone-first TypeScript context, memory, and knowledge platform. The same contracts serve a laptop install (`brainledge` CLI + SQLite + loopback) and enterprise deployments (PostgreSQL, OIDC, workers).
 
-## Getting Started
+- **CLI:** `brainledge`
+- **npm scope:** `@brainledge/*`
+- **License:** Apache-2.0
+- **Design:** [docs/rfc/0001-standalone-first-context-platform.md](docs/rfc/0001-standalone-first-context-platform.md)
+
+## Getting started
 
 ### Prerequisites
 
 - [pnpm](https://pnpm.io/) **11.x** (see `packageManager` in `package.json`; use [Corepack](https://nodejs.org/api/corepack.html): `corepack enable`)
-- Node.js **22+** (see `engines` in `package.json`; `.node-version` pins the version used for local dev and CI)
-
-Dependency installs follow pnpm 11 supply-chain settings in [`pnpm-workspace.yaml`](pnpm-workspace.yaml): **minimum release age** (this template uses a **7-day** quarantine, stricter than pnpm’s built-in 24-hour default), **blocking exotic transitive dependencies**, and an **`allowBuilds`** allowlist for packages that run install scripts. See [pnpm 11 release notes](https://pnpm.io/blog/releases/11.0) and [Supply-chain defaults (Socket)](https://socket.dev/blog/pnpm-11-adds-new-supply-chain-protection-defaults).
-
-Linting and formatting use [Trunk](https://trunk.io/) (ESLint, Prettier, and more). The Trunk **launcher** is installed with project dependencies—you do not need a separate Trunk install for the default workflow.
-
-### Installation
+- Node.js **24.x** preferred (see `.node-version`; `node:sqlite` is experimental)
 
 ```bash
 pnpm install
-```
-
-Optional: prefetch Trunk’s hermetic tools (helpful for offline work or CI images):
-
-```bash
-pnpm exec trunk install
-```
-
-If you prefer a global `trunk` on your PATH, see the [Trunk installation guide](https://docs.trunk.io/references/cli/getting-started/install) (e.g. `brew install trunk-io` on macOS).
-
-### Supply-chain protections
-
-The template uses **pnpm 11** with settings in [`pnpm-workspace.yaml`](pnpm-workspace.yaml): a **7-day** [`minimumReleaseAge`](https://pnpm.io/settings#minimumreleaseage) (10080 minutes, stricter than pnpm’s default 1 day), [`blockExoticSubdeps`](https://pnpm.io/settings#blockexoticsubdeps) enabled, and an [`allowBuilds`](https://pnpm.io/settings#allowbuilds) map for dependencies that must run install scripts (pnpm 11 requires this for native toolchain packages such as esbuild). See the [pnpm 11 release notes](https://pnpm.io/blog/releases/11.0).
-
-CI: pull requests and `main` run `pnpm lint:security` then generate/scan an SPDX SBOM (`.github/workflows/sbom.yml`). Publish re-checks `pnpm lint:security` before npm publish.
-
-### Build
-
-```bash
 pnpm build
-```
-
-### Test
-
-```bash
 pnpm test
 ```
 
-### Linting & Formatting
+### Laptop demo
 
 ```bash
-pnpm lint
-pnpm format
+pnpm --filter @brainledge/cli exec node dist/main.js init --data-dir /tmp/brainledge
+pnpm --filter @brainledge/cli exec node dist/main.js remember --data-dir /tmp/brainledge "Alice moved to Tokyo in July 2026."
+pnpm --filter @brainledge/cli exec node dist/main.js recall --data-dir /tmp/brainledge "Where does Alice live?"
 ```
 
-## Project Structure
+Phase 1 recall is lexical + recency over episode text (not extracted facts). Extraction runs via `memory.consolidate`.
 
-- `packages/`: Monorepo packages
-  - `common/`: Shared utilities and types
+### Packages
 
-## License
+| Package               | Role                                           |
+| --------------------- | ---------------------------------------------- |
+| `@brainledge/core`    | Domain, ports, `createApplication`             |
+| `@brainledge/storage` | SQLite, in-memory Nullables, Postgres adapters |
+| `@brainledge/server`  | Hono REST + MCP JSON-RPC                       |
+| `@brainledge/cli`     | `brainledge` CLI                               |
+| `@brainledge/web`     | Vite UI (remember / recall / spaces)           |
 
-{LICENSE}
+CLI and server only construct adapters. `@brainledge/core` does not import Hono, `node:sqlite`, or `pg`.
+
+## Quality gates
+
+```bash
+pnpm lint:eslint
+pnpm knip
+pnpm test
+pnpm coverage
+pnpm build
+```
+
+## Enterprise path
+
+`compose.yaml` runs Postgres + API + worker (`APP_PROFILE=enterprise`). Optional `--profile auth` and `--profile object-storage`. See `docs/deploy/gcp.md` and `docs/deploy/aws.md`.

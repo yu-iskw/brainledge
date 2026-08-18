@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: brainledge
+      POSTGRES_PASSWORD: brainledge
+      POSTGRES_DB: brainledge
+    ports:
+      - 5432:5432
+  app:
+    build: .
+    command:
+      - node
+      - packages/server/dist/main.js
+      - api
+    environment:
+      APP_PROFILE: enterprise
+      DATABASE_URL: postgres://brainledge:brainledge@postgres:5432/brainledge
+      BRAINLEDGE_HOST: 127.0.0.1
+    depends_on:
+      - postgres
+  worker:
+    build: .
+    command:
+      - node
+      - packages/server/dist/main.js
+      - worker
+    environment:
+      APP_PROFILE: enterprise
+      DATABASE_URL: postgres://brainledge:brainledge@postgres:5432/brainledge
+    depends_on:
+      - postgres
+  oidc:
+    image: postgres:16-alpine
+    profiles:
+      - auth
+    command:
+      - postgres
+      - --version
+  minio:
+    image: minio/minio:latest
+    profiles:
+      - object-storage
+    command:
+      - server
+      - /data

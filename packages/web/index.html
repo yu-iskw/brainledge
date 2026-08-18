@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brainledge</title>
+  </head>
+  <body>
+    <main>
+      <h1>Brainledge</h1>
+      <section>
+        <h2>Remember</h2>
+        <textarea id="remember-input" rows="4" cols="60"></textarea>
+        <button id="remember-button" type="button">Remember</button>
+      </section>
+      <section>
+        <h2>Recall</h2>
+        <input id="recall-input" type="search" />
+        <button id="recall-button" type="button">Recall</button>
+        <pre id="recall-output"></pre>
+      </section>
+      <section>
+        <h2>Spaces</h2>
+        <p>
+          Standalone uses <code>ks_default</code>. Org admin is hidden until enterprise profile.
+        </p>
+      </section>
+      <section>
+        <h2>Ingestion</h2>
+        <p>Markdown ingest is available at <code>POST /api/v1/spaces/:id/ingestions</code>.</p>
+      </section>
+      <section>
+        <h2>Provenance / Timeline / Graph</h2>
+        <p>
+          Explore API projections at <code>/api/v1/spaces/:id/provenance</code> and
+          <code>/timeline</code>.
+        </p>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

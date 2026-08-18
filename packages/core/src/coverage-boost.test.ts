@@ -37,6 +37,7 @@ function emptyJobs(): JobRepository {
     claim: () => Promise.resolve(undefined),
     succeed: () => Promise.resolve(),
     fail: () => Promise.resolve(),
+    requeueStaleRunning: () => Promise.resolve(0),
   };
 }
 
@@ -66,6 +67,13 @@ describe('coverage boost', () => {
         }
         return Promise.resolve();
       },
+      purge: ({ episodeId }) => {
+        const index = episodes.findIndex((item) => item.id === episodeId);
+        if (index >= 0) {
+          episodes.splice(index, 1);
+        }
+        return Promise.resolve();
+      },
     };
     const evidenceRepo: EvidenceRepository = {
       insert: ({ evidence }) => {
@@ -74,6 +82,14 @@ describe('coverage boost', () => {
       },
       findById: ({ evidenceId }) =>
         Promise.resolve(evidenceItems.find((item) => item.id === evidenceId)),
+      purgeBySource: ({ sourceId }) => {
+        for (let index = evidenceItems.length - 1; index >= 0; index -= 1) {
+          if (evidenceItems[index]?.sourceId === sourceId) {
+            evidenceItems.splice(index, 1);
+          }
+        }
+        return Promise.resolve();
+      },
     };
     const spaces: SpaceRepository = {
       get: () => Promise.resolve(undefined),
@@ -198,6 +214,7 @@ describe('coverage boost', () => {
       claim: () => Promise.resolve(jobsQueue.shift()),
       succeed: () => Promise.resolve(),
       fail: () => Promise.resolve(),
+      requeueStaleRunning: () => Promise.resolve(0),
     };
     expect(await runQueuedJobs(jobRepo, {})).toBe(1);
     const exploding = {
@@ -221,6 +238,7 @@ describe('coverage boost', () => {
           })(),
           succeed: () => Promise.resolve(),
           fail: () => Promise.resolve(),
+          requeueStaleRunning: () => Promise.resolve(0),
         },
         {
           boom: () => {

@@ -30,6 +30,17 @@ export function formatObservedAt(iso: string): string {
   }).format(millis);
 }
 
+export function formatWorkspaceName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    return 'This workspace';
+  }
+  if (/^[A-Z0-9][A-Z0-9 _-]{0,31}$/u.test(trimmed)) {
+    return trimmed.charAt(0) + trimmed.slice(1).toLowerCase().replaceAll('_', ' ');
+  }
+  return trimmed;
+}
+
 export function formatOperatorLabel(principalType: string | undefined): string {
   if (principalType === 'local' || principalType === undefined) {
     return 'This device';

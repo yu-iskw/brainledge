@@ -28,8 +28,8 @@ function isActive(id: string, state: GraphDrawState): boolean {
 }
 
 function shouldShowEdgeLabel(state: GraphDrawState, sourceId: string, targetId: string): boolean {
-  if (state.camera.scale <= 0.85) {
-    return false;
+  if (state.edges.length <= 24 || state.camera.scale > 0.55) {
+    return true;
   }
   return (
     state.selectedId === sourceId ||

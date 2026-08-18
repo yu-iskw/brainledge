@@ -47,6 +47,15 @@ export function createInMemoryFactRepository(facts: Fact[] = []): FactRepository
       );
       return Promise.resolve(findContradictoryPairs(scoped));
     },
+    purgeBySourceEpisode({ workspaceId, sourceEpisodeId }) {
+      for (let index = facts.length - 1; index >= 0; index -= 1) {
+        const item = facts[index];
+        if (item.workspaceId === workspaceId && item.sourceEpisodeId === sourceEpisodeId) {
+          facts.splice(index, 1);
+        }
+      }
+      return Promise.resolve();
+    },
   };
 }
 

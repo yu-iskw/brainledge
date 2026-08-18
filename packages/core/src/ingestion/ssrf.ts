@@ -1,3 +1,5 @@
+import dns from 'node:dns/promises';
+
 const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '[::1]']);
 
 function isPrivateIpv4(hostname: string): boolean {
@@ -60,6 +62,37 @@ function isBlockedHost(rawHostname: string): boolean {
     );
   }
   return isPrivateIpv4(hostname);
+}
+
+export interface IngestResolvedAddress {
+  readonly address: string;
+  readonly family: number;
+}
+
+export type IngestLookup = (hostname: string) => Promise<readonly IngestResolvedAddress[]>;
+
+export function assertSafeResolvedAddresses(addresses: readonly string[]): void {
+  if (addresses.length === 0) {
+    throw new Error('INGEST_URL_SSRF');
+  }
+  for (const address of addresses) {
+    if (isBlockedHost(address)) {
+      throw new Error('INGEST_URL_SSRF');
+    }
+  }
+}
+
+export async function resolveSafeIngestAddresses(
+  hostname: string,
+  lookup: IngestLookup = defaultIngestLookup,
+): Promise<readonly IngestResolvedAddress[]> {
+  const records = await lookup(hostname);
+  assertSafeResolvedAddresses(records.map((record) => record.address));
+  return records;
+}
+
+async function defaultIngestLookup(hostname: string): Promise<readonly IngestResolvedAddress[]> {
+  return dns.lookup(hostname, { all: true });
 }
 
 export function assertSafeIngestionUrl(raw: string): URL {

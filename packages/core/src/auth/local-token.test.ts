@@ -56,6 +56,7 @@ describe('job runner', () => {
         return Promise.resolve();
       },
       fail: () => Promise.resolve(),
+      requeueStaleRunning: () => Promise.resolve(0),
     };
     const processed = await runQueuedJobs(repo, {
       ping: () => Promise.resolve(),

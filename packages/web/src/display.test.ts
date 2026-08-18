@@ -8,6 +8,7 @@ import {
   formatOperatorLabel,
   formatProvenanceLabel,
   formatSavedStatus,
+  formatWorkspaceName,
   humanizeEntityId,
   humanizePredicate,
   modeHeading,
@@ -38,6 +39,7 @@ describe('display copy', () => {
     expect(formatIngestStatus('succeeded', 2)).toBe('Ingest succeeded · 2 segments');
     expect(formatIngestStatus('succeeded', 1)).toBe('Ingest succeeded · 1 segment');
     expect(formatOperatorLabel('local')).toBe('This device');
+    expect(formatWorkspaceName('PERSONAL')).toBe('Personal');
     expect(modeHeading('capture')).toBe('Capture');
     expect(spaceInitial('default')).toBe('D');
     expect(formatProvenanceLabel('Alice moved to Tokyo in July 2026.')).toBe(

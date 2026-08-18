@@ -190,8 +190,15 @@ export function createMemoryService(deps: {
           return;
         }
         case 'purge': {
-          await deps.episodes.delete({ workspaceId: context.workspaceId, episodeId });
-          await retractLinkedFacts();
+          await deps.facts?.purgeBySourceEpisode({
+            workspaceId: context.workspaceId,
+            sourceEpisodeId: episodeId,
+          });
+          await deps.evidence.purgeBySource({
+            workspaceId: context.workspaceId,
+            sourceId: episodeId,
+          });
+          await deps.episodes.purge({ workspaceId: context.workspaceId, episodeId });
           await deps.embeddings?.deleteByTarget({
             workspaceId: context.workspaceId,
             targetType: 'episode',

@@ -128,7 +128,7 @@ describe('drawKnowledgeGraph', () => {
     );
     expect(calls.includes('lineTo') || calls.includes('moveTo')).toBe(true);
     expect(calls).toContain('closePath');
-    expect(fillTexts).toEqual(expect.arrayContaining([alice.label, tokyo.label]));
+    expect(fillTexts).toEqual(expect.arrayContaining([alice.label, tokyo.label, livesIn.label]));
   });
 
   it('strokes the selected node', () => {

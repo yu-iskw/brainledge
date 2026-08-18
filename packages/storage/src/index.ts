@@ -37,5 +37,6 @@ export {
 export { createSqliteFactRepository } from './sqlite/sqlite-fact-repository.js';
 export { createSqliteEntityRepository } from './sqlite/sqlite-entity-repository.js';
 export { createSqliteEmbeddingStore } from './sqlite/sqlite-embedding-store.js';
+export { createSqliteDecisionRepository } from './sqlite/sqlite-decision-repository.js';
 export { SCHEMA_VERSION } from './sqlite/schema.js';
 export { describeStorageAdapter } from './testing/storage-contract.js';

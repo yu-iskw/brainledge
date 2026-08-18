@@ -158,7 +158,13 @@ export type {
   WebhookPort,
 } from './plugins/p2-ports.js';
 export { extractTypedFacts } from './ingestion/extract.js';
-export { assertSafeIngestionUrl, assertSafeRelativePath } from './ingestion/ssrf.js';
+export {
+  assertSafeIngestionUrl,
+  assertSafeRelativePath,
+  assertSafeResolvedAddresses,
+  resolveSafeIngestAddresses,
+} from './ingestion/ssrf.js';
+export type { IngestLookup, IngestResolvedAddress } from './ingestion/ssrf.js';
 export { MAX_INGEST_BYTES, parseMarkdownDocument } from './ingestion/markdown.js';
 export { evaluateDatalog } from './reasoning/datalog.js';
 export type { DatalogRule, DatalogTuple } from './reasoning/datalog.js';

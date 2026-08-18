@@ -135,5 +135,19 @@ export function createSqliteFactRepository(database: DatabaseSync): FactReposito
     findContradictions({ workspaceId, knowledgeSpaceId }) {
       return this.query({ workspaceId, knowledgeSpaceId, limit: 500 }).then(findContradictoryPairs);
     },
+    purgeBySourceEpisode({ workspaceId, sourceEpisodeId }) {
+      database
+        .prepare(
+          `DELETE FROM fact_evidence
+           WHERE fact_id IN (
+             SELECT id FROM facts WHERE source_episode_id = ? AND workspace_id = ?
+           )`,
+        )
+        .run(sourceEpisodeId, workspaceId);
+      database
+        .prepare('DELETE FROM facts WHERE source_episode_id = ? AND workspace_id = ?')
+        .run(sourceEpisodeId, workspaceId);
+      return Promise.resolve();
+    },
   };
 }

@@ -24,7 +24,11 @@ describe('status doctor backup', () => {
     writeFileSync(path.join(dataDir, 'blobs', 'note.txt'), 'blob-bytes');
     await cmdBackup(archive, dataDir);
     const restored = mkdtempSync(path.join(os.tmpdir(), 'brainledge-rst-'));
+    writeFileSync(path.join(restored, 'database.sqlite-wal'), 'stale-wal');
+    writeFileSync(path.join(restored, 'database.sqlite-shm'), 'stale-shm');
     await cmdRestore(archive, restored);
+    expect(existsSync(path.join(restored, 'database.sqlite-wal'))).toBe(false);
+    expect(existsSync(path.join(restored, 'database.sqlite-shm'))).toBe(false);
     expect(existsSync(path.join(restored, 'config.json'))).toBe(true);
     expect(existsSync(path.join(restored, 'blobs', 'note.txt'))).toBe(true);
     const recalled = await cmdRecall('Alice', restored);

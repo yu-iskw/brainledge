@@ -45,7 +45,7 @@ function errorMessage(body: unknown, fallback: string): string {
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, init);
+    response = await fetch(path, { ...init, credentials: 'same-origin' });
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : 'Network request failed';
     throw new FetchError(message, 0);

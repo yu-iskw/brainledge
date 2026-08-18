@@ -115,6 +115,15 @@ function createEpisodeTableEmulator(): { query: PostgresQueryFn; rows: Record<st
       return Promise.resolve({ rows: [] });
     }
 
+    if (normalized.startsWith('delete from episodes')) {
+      const [id, workspaceId] = params;
+      const index = rows.findIndex((item) => item.id === id && item.workspace_id === workspaceId);
+      if (index >= 0) {
+        rows.splice(index, 1);
+      }
+      return Promise.resolve({ rows: [] });
+    }
+
     throw new Error(`unhandled sql in emulator: ${sql}`);
   };
 
@@ -182,6 +191,31 @@ describe('postgres episode repository', () => {
       episodeId: asEpisodeId('ep_pg_1'),
     });
     expect(deleted).toBeUndefined();
+
+    await episodes.insert({
+      workspaceId: LOCAL_WORKSPACE_ID,
+      episode: {
+        id: asEpisodeId('ep_pg_purge'),
+        workspaceId: LOCAL_WORKSPACE_ID,
+        knowledgeSpaceId: LOCAL_SPACE_ID,
+        kind: 'note',
+        observedAt: FIXED_TIME,
+        contentHash: 'hash2',
+        content: 'purge me',
+        hidden: false,
+        metadata: {},
+      },
+    });
+    await episodes.purge({
+      workspaceId: LOCAL_WORKSPACE_ID,
+      episodeId: asEpisodeId('ep_pg_purge'),
+    });
+    expect(
+      await episodes.findById({
+        workspaceId: LOCAL_WORKSPACE_ID,
+        episodeId: asEpisodeId('ep_pg_purge'),
+      }),
+    ).toBeUndefined();
 
     const leaked = await episodes.findById({
       workspaceId: asWorkspaceId('ws_other'),

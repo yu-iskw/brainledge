@@ -44,6 +44,7 @@ function createQueueRepository(queue: JobRecord[]): {
         failed.push({ jobId, errorCode });
         return Promise.resolve();
       },
+      requeueStaleRunning: () => Promise.resolve(0),
     },
   };
 }

@@ -13,11 +13,19 @@ function ensureFactSourceEpisodeColumn(database: DatabaseSync): void {
   }
 }
 
+function ensureJobsClaimedAtColumn(database: DatabaseSync): void {
+  const columns = database.prepare('PRAGMA table_info(jobs)').all() as { name: string }[];
+  if (!columns.some((column) => column.name === 'claimed_at')) {
+    database.exec('ALTER TABLE jobs ADD COLUMN claimed_at TEXT');
+  }
+}
+
 export function openSqliteDatabase(filePath: string): DatabaseSync {
   mkdirSync(path.dirname(filePath), { recursive: true });
   const database = new DatabaseSync(filePath);
   database.exec(SQLITE_SCHEMA);
   ensureFactSourceEpisodeColumn(database);
+  ensureJobsClaimedAtColumn(database);
   const row = database.prepare('SELECT version FROM schema_metadata LIMIT 1').get() as
     { version: number } | undefined;
   if (row === undefined) {

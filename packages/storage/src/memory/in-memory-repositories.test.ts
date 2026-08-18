@@ -70,6 +70,17 @@ describe('in-memory repositories', () => {
     ).toBe(1);
     await episodes.hide({ workspaceId: LOCAL_WORKSPACE_ID, episodeId: episode.id });
     await episodes.delete({ workspaceId: LOCAL_WORKSPACE_ID, episodeId: episode.id });
+    await episodes.insert({
+      workspaceId: LOCAL_WORKSPACE_ID,
+      episode: { ...episode, id: 'ep_purge' as never, content: 'purge target' },
+    });
+    await episodes.purge({ workspaceId: LOCAL_WORKSPACE_ID, episodeId: 'ep_purge' as never });
+    expect(
+      await episodes.findById({
+        workspaceId: LOCAL_WORKSPACE_ID,
+        episodeId: 'ep_purge' as never,
+      }),
+    ).toBeUndefined();
     await evidence.insert({
       workspaceId: LOCAL_WORKSPACE_ID,
       evidence: {
@@ -83,6 +94,10 @@ describe('in-memory repositories', () => {
     expect(
       await evidence.findById({ workspaceId: LOCAL_WORKSPACE_ID, evidenceId: 'ev_1' as never }),
     ).toBeDefined();
+    await evidence.purgeBySource({ workspaceId: LOCAL_WORKSPACE_ID, sourceId: episode.id });
+    expect(
+      await evidence.findById({ workspaceId: LOCAL_WORKSPACE_ID, evidenceId: 'ev_1' as never }),
+    ).toBeUndefined();
     await jobs.enqueue({
       workspaceId: LOCAL_WORKSPACE_ID,
       job: {
@@ -97,6 +112,13 @@ describe('in-memory repositories', () => {
     });
     const claimed = await jobs.claim({ limit: 1 });
     expect(claimed).toBeDefined();
+    expect(
+      await jobs.requeueStaleRunning({
+        olderThanMs: 0,
+        now: parseIsoUtc(new Date().toISOString()),
+      }),
+    ).toBe(1);
+    expect((await jobs.claim({ limit: 1 }))?.id).toBe('job_1');
     await jobs.succeed({ workspaceId: LOCAL_WORKSPACE_ID, jobId: 'job_1' as never });
     await jobs.fail({ workspaceId: LOCAL_WORKSPACE_ID, jobId: 'job_1' as never, errorCode: 'x' });
     const fact = {

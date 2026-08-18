@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseMarkdownDocument } from './markdown.js';
-import { assertSafeIngestionUrl, assertSafeRelativePath } from './ssrf.js';
+import {
+  assertSafeIngestionUrl,
+  assertSafeRelativePath,
+  assertSafeResolvedAddresses,
+  resolveSafeIngestAddresses,
+} from './ssrf.js';
 
 describe('ingestion safety', () => {
   it('rejects loopback URLs and path traversal', () => {
@@ -16,6 +21,24 @@ describe('ingestion safety', () => {
       /SSRF/u,
     );
     expect(() => assertSafeIngestionUrl('http://[::ffff:127.0.0.1]/secret')).toThrow(/SSRF/u);
+  });
+
+  it('rejects resolved loopback addresses from an injected lookup', async () => {
+    expect(() => assertSafeResolvedAddresses(['127.0.0.1'])).toThrow(/SSRF/u);
+    expect(() => assertSafeResolvedAddresses(['8.8.8.8'])).not.toThrow();
+    await expect(
+      resolveSafeIngestAddresses('evil.example', () =>
+        Promise.resolve([{ address: '127.0.0.1', family: 4 }]),
+      ),
+    ).rejects.toThrow(/SSRF/u);
+    await expect(
+      resolveSafeIngestAddresses('safe.example', () =>
+        Promise.resolve([{ address: '8.8.8.8', family: 4 }]),
+      ),
+    ).resolves.toEqual([{ address: '8.8.8.8', family: 4 }]);
+    await expect(
+      resolveSafeIngestAddresses('empty.example', () => Promise.resolve([])),
+    ).rejects.toThrow(/SSRF/u);
   });
 
   it('segments markdown', () => {

@@ -148,5 +148,12 @@ export function createPostgresEpisodeRepository(query: PostgresQueryFn): Episode
         workspaceId,
       ]).then(() => undefined);
     },
+
+    purge({ workspaceId, episodeId }) {
+      return query('DELETE FROM episodes WHERE id = $1 AND workspace_id = $2', [
+        episodeId,
+        workspaceId,
+      ]).then(() => undefined);
+    },
   };
 }

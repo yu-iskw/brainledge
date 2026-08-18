@@ -145,19 +145,19 @@
             hidden
           >
             <article class="card">
-              <h2 id="recall-heading">Recall</h2>
+              <h2 id="recall-heading">Ask</h2>
               <label for="recall-input">Question</label>
               <div class="row">
                 <input id="recall-input" type="search" autocomplete="off" />
                 <button id="recall-button" type="button">Recall</button>
               </div>
+              <p id="recall-output" class="recall-answer" aria-live="polite"></p>
             </article>
             <div class="split recall-body">
               <article class="card">
                 <p class="eyebrow">Memories</p>
                 <h3>Matching notes</h3>
                 <p class="meta">Episodes that answered the question.</p>
-                <pre id="recall-output" class="sr-only" aria-live="polite"></pre>
                 <ul id="recall-memories" class="data-list" aria-label="Matching memories"></ul>
               </article>
               <article class="card">
@@ -173,7 +173,7 @@
 
           <section
             id="panel-inspect"
-            class="panel"
+            class="panel inspect-layout"
             role="tabpanel"
             aria-labelledby="tab-inspect"
             hidden
@@ -182,14 +182,31 @@
               <p class="eyebrow">Graph</p>
               <h2 id="graph-heading">Knowledge map</h2>
               <p class="meta">
-                Nodes are people and places. Edges are facts. Drag to pan, scroll to zoom, click a
-                node to inspect its source.
+                People and places are nodes. Labeled edges are facts. Drag to pan, scroll to zoom,
+                click a node to inspect its source.
               </p>
               <div class="graph-toolbar">
                 <button id="graph-zoom-out" class="secondary" type="button">Zoom out</button>
                 <button id="graph-zoom-in" class="secondary" type="button">Zoom in</button>
                 <button id="graph-fit" class="secondary" type="button">Fit</button>
+                <label class="graph-search" for="graph-search"
+                  >Find
+                  <input
+                    id="graph-search"
+                    type="search"
+                    placeholder="Alice, Tokyo…"
+                    autocomplete="off"
+                  />
+                </label>
               </div>
+              <ul class="graph-legend" aria-label="Map legend">
+                <li><span class="legend-swatch legend-entity"></span>People</li>
+                <li><span class="legend-swatch legend-literal"></span>Places and things</li>
+                <li>
+                  <span class="legend-swatch legend-edge"></span>
+                  <span id="graph-legend-facts">Facts</span>
+                </li>
+              </ul>
               <div class="graph-frame">
                 <canvas id="knowledge-graph" aria-label="Knowledge graph"></canvas>
                 <div id="graph-empty" class="empty-state" hidden>
@@ -200,10 +217,10 @@
                 </div>
               </div>
               <p id="graph-caption" class="meta"></p>
-              <ul id="graph-list" class="data-list" aria-label="Graph facts"></ul>
+              <aside id="graph-inspector" class="graph-inspector" hidden></aside>
               <p id="graph-status" class="status" aria-live="polite"></p>
             </article>
-            <div class="split">
+            <div class="inspect-rail">
               <article class="card">
                 <p class="eyebrow">Dossier</p>
                 <h2>Selected episode</h2>
@@ -218,6 +235,11 @@
                   <button id="forget-button" class="danger" type="button">Hide episode</button>
                 </div>
                 <p id="inspect-status" class="status" aria-live="polite"></p>
+              </article>
+              <article class="card">
+                <p class="eyebrow">Map</p>
+                <h2>Facts on the map</h2>
+                <ul id="graph-list" class="data-list" aria-label="Graph facts"></ul>
               </article>
               <article class="card">
                 <h2 id="timeline-heading">Episodes</h2>

@@ -19,6 +19,7 @@ export interface GraphViewHandle {
   setGraph: (nodes: readonly KnowledgeGraphNode[], edges: readonly KnowledgeGraphEdge[]) => void;
   setCamera: (camera: GraphCamera) => void;
   selectNode: (id: string | undefined) => void;
+  focusNode: (id: string | undefined) => void;
   nodeIds: () => readonly string[];
   positions: () => readonly { id: string; x: number; y: number }[];
   camera: () => GraphCamera;
@@ -48,6 +49,10 @@ export function bindKnowledgeGraph(
   let lastX = 0;
   let lastY = 0;
 
+  let lastNodes: readonly KnowledgeGraphNode[] = [];
+  let lastEdges: readonly KnowledgeGraphEdge[] = [];
+  let layoutWidth = 0;
+  let layoutHeight = 0;
   let laidOutWidth = 0;
   let laidOutHeight = 0;
   let deviceRatio = 0;
@@ -78,6 +83,27 @@ export function bindKnowledgeGraph(
       hoveredId,
       focusIds: neighborIds(selectedId, edges),
     });
+  };
+
+  const applyLayout = (width: number, height: number): void => {
+    layoutWidth = width;
+    layoutHeight = height;
+    if (lastNodes.length === 0) {
+      nodes = [];
+      return;
+    }
+    nodes = layoutKnowledgeGraph(lastNodes, lastEdges, width, height);
+    camera = fitCamera(nodes, width, height);
+  };
+
+  const relayoutIfNeeded = (): void => {
+    const { width, height } = size();
+    if (width === layoutWidth && height === layoutHeight) {
+      redraw();
+      return;
+    }
+    applyLayout(width, height);
+    redraw();
   };
 
   const localPoint = (event: MouseEvent): { x: number; y: number } => {
@@ -146,14 +172,20 @@ export function bindKnowledgeGraph(
   canvas.addEventListener('pointercancel', onPointerCancel);
   canvas.addEventListener('wheel', onWheel, { passive: false });
 
+  const resizeObserver = new ResizeObserver(() => {
+    relayoutIfNeeded();
+  });
+  resizeObserver.observe(canvas);
+
   return {
     setGraph(nextNodes, nextEdges) {
-      const { width, height } = size();
+      lastNodes = nextNodes;
+      lastEdges = nextEdges;
       edges = nextEdges;
-      nodes = layoutKnowledgeGraph(nextNodes, nextEdges, width, height);
-      camera = fitCamera(nodes, width, height);
       selectedId = undefined;
       hoveredId = undefined;
+      const { width, height } = size();
+      applyLayout(width, height);
       redraw();
     },
     setCamera(next) {
@@ -162,6 +194,27 @@ export function bindKnowledgeGraph(
     },
     selectNode(id) {
       selectedId = id;
+      redraw();
+    },
+    focusNode(id) {
+      selectedId = id;
+      if (id === undefined) {
+        onSelect(undefined, undefined);
+        redraw();
+        return;
+      }
+      const node = nodes.find((item) => item.id === id);
+      if (node === undefined) {
+        onSelect(undefined, undefined);
+        redraw();
+        return;
+      }
+      const { width, height } = size();
+      const screen = worldToScreen(camera, node.x, node.y);
+      camera = panCamera(camera, width / 2 - screen.x, height / 2 - screen.y);
+      const outgoing = edges.find((item) => item.sourceId === selectedId);
+      const incident = outgoing ?? edges.find((item) => item.targetId === selectedId);
+      onSelect(node, incident?.sourceEpisodeId);
       redraw();
     },
     nodeIds() {
@@ -191,6 +244,7 @@ export function bindKnowledgeGraph(
     },
     redraw,
     destroy() {
+      resizeObserver.disconnect();
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);

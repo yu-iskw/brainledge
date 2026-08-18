@@ -53,5 +53,12 @@ export function createSqliteEvidenceRepository(database: DatabaseSync): Evidence
         observedAt: row.observed_at as Evidence['observedAt'],
       });
     },
+
+    purgeBySource({ workspaceId, sourceId }) {
+      database
+        .prepare('DELETE FROM evidence WHERE source_id = ? AND workspace_id = ?')
+        .run(sourceId, workspaceId);
+      return Promise.resolve();
+    },
   };
 }

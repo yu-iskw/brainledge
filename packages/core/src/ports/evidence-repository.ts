@@ -7,4 +7,5 @@ export interface EvidenceRepository {
     workspaceId: WorkspaceId;
     evidenceId: EvidenceId;
   }): Promise<Evidence | undefined>;
+  purgeBySource(input: { workspaceId: WorkspaceId; sourceId: string }): Promise<void>;
 }

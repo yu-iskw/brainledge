@@ -86,7 +86,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   status TEXT NOT NULL,
   attempts INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
-  error_code TEXT
+  error_code TEXT,
+  claimed_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS job_attempts (
@@ -175,6 +176,17 @@ CREATE TABLE IF NOT EXISTS ingestions (
   idempotency_key TEXT,
   created_at TEXT NOT NULL,
   error_code TEXT
+);
+
+CREATE TABLE IF NOT EXISTS decisions (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  knowledge_space_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  rationale TEXT NOT NULL,
+  snapshot_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  status TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_episodes_workspace_space

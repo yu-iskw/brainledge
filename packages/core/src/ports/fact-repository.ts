@@ -1,4 +1,4 @@
-import type { FactId, KnowledgeSpaceId, WorkspaceId } from '../domain/ids.js';
+import type { EpisodeId, FactId, KnowledgeSpaceId, WorkspaceId } from '../domain/ids.js';
 import type { IsoUtcTimestamp } from '../domain/time.js';
 import type { Fact } from '../knowledge/fact.js';
 
@@ -16,4 +16,8 @@ export interface FactRepository {
     workspaceId: WorkspaceId;
     knowledgeSpaceId: KnowledgeSpaceId;
   }): Promise<readonly [Fact, Fact][]>;
+  purgeBySourceEpisode(input: {
+    workspaceId: WorkspaceId;
+    sourceEpisodeId: EpisodeId;
+  }): Promise<void>;
 }

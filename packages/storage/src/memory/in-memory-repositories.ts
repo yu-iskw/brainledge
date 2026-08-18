@@ -99,6 +99,15 @@ export function createInMemoryEpisodeRepository(store: InMemoryStores): EpisodeR
       }
       return Promise.resolve();
     },
+    purge({ workspaceId, episodeId }) {
+      const index = store.episodes.findIndex(
+        (item) => item.workspaceId === workspaceId && item.id === episodeId,
+      );
+      if (index >= 0) {
+        store.episodes.splice(index, 1);
+      }
+      return Promise.resolve();
+    },
   };
 }
 
@@ -113,6 +122,15 @@ export function createInMemoryEvidenceRepository(store: InMemoryStores): Evidenc
       return Promise.resolve(
         store.evidence.find((item) => item.workspaceId === workspaceId && item.id === evidenceId),
       );
+    },
+    purgeBySource({ workspaceId, sourceId }) {
+      for (let index = store.evidence.length - 1; index >= 0; index -= 1) {
+        const item = store.evidence[index];
+        if (item.workspaceId === workspaceId && item.sourceId === sourceId) {
+          store.evidence.splice(index, 1);
+        }
+      }
+      return Promise.resolve();
     },
   };
 }
@@ -172,6 +190,7 @@ export function createInMemoryJobRepository(store: InMemoryStores): JobRepositor
         ...current,
         status: 'running',
         attempts: current.attempts + 1,
+        claimedAt: new Date().toISOString() as JobRecord['claimedAt'],
       };
       store.jobs[index] = next;
       return Promise.resolve(next);
@@ -193,6 +212,21 @@ export function createInMemoryJobRepository(store: InMemoryStores): JobRepositor
         store.jobs[index] = { ...store.jobs[index], status: 'failed', errorCode };
       }
       return Promise.resolve();
+    },
+    requeueStaleRunning({ olderThanMs, now }) {
+      const cutoff = Date.parse(now) - olderThanMs;
+      let count = 0;
+      for (const [index, job] of store.jobs.entries()) {
+        if (job.status !== 'running') {
+          continue;
+        }
+        const claimedAtMs = job.claimedAt === undefined ? 0 : Date.parse(job.claimedAt);
+        if (claimedAtMs <= cutoff) {
+          store.jobs[index] = { ...job, status: 'queued' };
+          count += 1;
+        }
+      }
+      return Promise.resolve(count);
     },
   };
 }

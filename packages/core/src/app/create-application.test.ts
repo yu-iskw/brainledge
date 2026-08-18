@@ -27,6 +27,7 @@ function emptyJobs(): JobRepository {
     claim: () => Promise.resolve(undefined),
     succeed: () => Promise.resolve(),
     fail: () => Promise.resolve(),
+    requeueStaleRunning: () => Promise.resolve(0),
   };
 }
 
@@ -84,6 +85,13 @@ function memoryRepos(): { episodes: EpisodeRepository; evidence: EvidenceReposit
         }
         return Promise.resolve();
       },
+      purge: ({ episodeId }) => {
+        const index = episodes.findIndex((item) => item.id === episodeId);
+        if (index >= 0) {
+          episodes.splice(index, 1);
+        }
+        return Promise.resolve();
+      },
     },
     evidence: {
       insert: ({ evidence }) => {
@@ -92,6 +100,14 @@ function memoryRepos(): { episodes: EpisodeRepository; evidence: EvidenceReposit
       },
       findById: ({ evidenceId }) =>
         Promise.resolve(evidenceItems.find((item) => item.id === evidenceId)),
+      purgeBySource: ({ sourceId }) => {
+        for (let index = evidenceItems.length - 1; index >= 0; index -= 1) {
+          if (evidenceItems[index]?.sourceId === sourceId) {
+            evidenceItems.splice(index, 1);
+          }
+        }
+        return Promise.resolve();
+      },
     },
   };
 }
@@ -128,6 +144,14 @@ function knowledgeRepos(): {
           storedFacts.filter((item) => item.retractedAt === undefined).slice(0, limit),
         ),
       findContradictions: () => Promise.resolve([]),
+      purgeBySourceEpisode: ({ sourceEpisodeId }) => {
+        for (let index = storedFacts.length - 1; index >= 0; index -= 1) {
+          if (storedFacts[index]?.sourceEpisodeId === sourceEpisodeId) {
+            storedFacts.splice(index, 1);
+          }
+        }
+        return Promise.resolve();
+      },
     },
     entities: {
       insert: ({ entity }) => {

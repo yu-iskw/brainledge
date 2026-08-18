@@ -55,10 +55,10 @@ export function fitCamera(
   let maxX = -Infinity;
   let maxY = -Infinity;
   for (const node of nodes) {
-    minX = Math.min(minX, node.x);
-    minY = Math.min(minY, node.y);
-    maxX = Math.max(maxX, node.x);
-    maxY = Math.max(maxY, node.y);
+    minX = Math.min(minX, node.x - NODE_RADIUS);
+    minY = Math.min(minY, node.y - NODE_RADIUS);
+    maxX = Math.max(maxX, node.x + NODE_RADIUS);
+    maxY = Math.max(maxY, node.y + NODE_RADIUS);
   }
   const spanX = Math.max(1, maxX - minX);
   const spanY = Math.max(1, maxY - minY);

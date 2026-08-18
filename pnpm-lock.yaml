@@ -101,6 +101,9 @@ importers:
       hono:
         specifier: ^4.9.8
         version: 4.13.1
+      undici:
+        specifier: ^8.10.0
+        version: 8.10.0
       zod:
         specifier: ^4.2.0
         version: 4.3.6
@@ -1714,6 +1717,10 @@ packages:
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
+  undici@8.10.0:
+    resolution: {integrity: sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ==}
+    engines: {node: '>=22.19.0'}
+
   unrs-resolver@1.11.1:
     resolution: {integrity: sha512-bSjt9pjaEBnNiGgc9rUiHGKv5l4/TGzDmYw3RhnkJGtLhbnnA/5qJj7x3dNDCRx/PJxu774LlH8lCOlB4hEfKg==}
 
@@ -3292,6 +3299,8 @@ snapshots:
   unbash@2.2.0: {}
 
   undici-types@7.16.0: {}
+
+  undici@8.10.0: {}
 
   unrs-resolver@1.11.1:
     dependencies:

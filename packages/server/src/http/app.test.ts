@@ -122,6 +122,21 @@ describe('http app', () => {
     expect(authorized.status).toBe(200);
   });
 
+  it('accepts the HttpOnly cookie set by GET / when a token is configured', async () => {
+    const application = createTestApplication();
+    const app = createHttpApp(application, { apiToken: 'test-secret-token' });
+    expect((await app.request('/api/v1/me')).status).toBe(401);
+    const home = await app.request('/');
+    expect(home.status).toBe(200);
+    const setCookie = home.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/brainledge_token=/u);
+    expect(setCookie).toMatch(/HttpOnly/u);
+    expect(setCookie).toMatch(/SameSite=Strict/u);
+    const cookie = setCookie.split(';')[0] ?? '';
+    const withCookie = await app.request('/api/v1/me', { headers: { cookie } });
+    expect(withCookie.status).toBe(200);
+  });
+
   it('queues URL ingestions after SSRF check without fetching', async () => {
     const application = createTestApplication();
     const app = createHttpApp(application);

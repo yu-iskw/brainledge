@@ -4,6 +4,7 @@ import {
   fitCamera,
   hitTestNode,
   neighborIds,
+  NODE_RADIUS,
   panCamera,
   worldToScreen,
   zoomAt,
@@ -53,8 +54,10 @@ describe('graph camera', () => {
       Math.max(...screens.map((point) => point.x)) - Math.min(...screens.map((point) => point.x));
     const spanY =
       Math.max(...screens.map((point) => point.y)) - Math.min(...screens.map((point) => point.y));
-    expect(spanX).toBeGreaterThan(800 * 0.45);
-    expect(spanY).toBeGreaterThan(448 * 0.35);
+    const visualSpanX = spanX + 2 * NODE_RADIUS * camera.scale;
+    const visualSpanY = spanY + 2 * NODE_RADIUS * camera.scale;
+    expect(visualSpanX).toBeGreaterThan(800 * 0.45);
+    expect(visualSpanY).toBeGreaterThan(448 * 0.35);
   });
 
   it('fits nodes and hits the selected world position', () => {

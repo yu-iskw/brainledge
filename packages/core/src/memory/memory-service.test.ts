@@ -14,7 +14,12 @@ import type { Evidence } from '../knowledge/evidence.js';
 import type { EpisodeRepository } from '../ports/episode-repository.js';
 import type { EvidenceRepository } from '../ports/evidence-repository.js';
 
-function inArrayRepos(): { episodes: EpisodeRepository; evidence: EvidenceRepository } {
+function inArrayRepos(): {
+  episodes: EpisodeRepository;
+  evidence: EvidenceRepository;
+  episodesList: Episode[];
+  evidenceList: Evidence[];
+} {
   const episodes: Episode[] = [];
   const evidenceItems: Evidence[] = [];
   return {
@@ -67,6 +72,17 @@ function inArrayRepos(): { episodes: EpisodeRepository; evidence: EvidenceReposi
       delete: ({ episodeId }) => {
         const index = episodes.findIndex((item) => item.id === episodeId);
         if (index >= 0) {
+          const found = episodes[index];
+          episodes[index] = {
+            ...found,
+            deletedAt: '2026-08-18T00:00:00.000Z' as Episode['deletedAt'],
+          };
+        }
+        return Promise.resolve();
+      },
+      purge: ({ episodeId }) => {
+        const index = episodes.findIndex((item) => item.id === episodeId);
+        if (index >= 0) {
           episodes.splice(index, 1);
         }
         return Promise.resolve();
@@ -79,7 +95,17 @@ function inArrayRepos(): { episodes: EpisodeRepository; evidence: EvidenceReposi
       },
       findById: ({ evidenceId }) =>
         Promise.resolve(evidenceItems.find((item) => item.id === evidenceId)),
+      purgeBySource: ({ sourceId }) => {
+        for (let index = evidenceItems.length - 1; index >= 0; index -= 1) {
+          if (evidenceItems[index]?.sourceId === sourceId) {
+            evidenceItems.splice(index, 1);
+          }
+        }
+        return Promise.resolve();
+      },
     },
+    episodesList: episodes,
+    evidenceList: evidenceItems,
   };
 }
 
@@ -105,5 +131,32 @@ describe('createMemoryService', () => {
     expect(await memory.consolidate(localContext(), { spaceId: LOCAL_SPACE_ID })).toEqual({
       factCount: 0,
     });
+  });
+
+  it('physically purges the episode and its evidence', async () => {
+    const repos = inArrayRepos();
+    const memory = createMemoryService({
+      authorizer: createLocalAuthorizer(),
+      clock: fixedClock(parseIsoUtc('2026-08-18T00:00:00.000Z')),
+      unitOfWork: passthroughUnitOfWork(),
+      episodes: repos.episodes,
+      evidence: repos.evidence,
+    });
+    const remembered = await memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice lives in Tokyo.',
+    });
+    await memory.forget(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      memoryId: remembered.episodeId,
+      mode: 'purge',
+    });
+    expect(
+      await repos.episodes.findById({
+        workspaceId: localContext().workspaceId,
+        episodeId: remembered.episodeId as never,
+      }),
+    ).toBeUndefined();
+    expect(repos.evidenceList).toHaveLength(0);
   });
 });

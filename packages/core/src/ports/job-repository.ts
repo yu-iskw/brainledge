@@ -12,6 +12,7 @@ export interface JobRecord {
   readonly attempts: number;
   readonly createdAt: IsoUtcTimestamp;
   readonly errorCode?: string;
+  readonly claimedAt?: IsoUtcTimestamp;
 }
 
 export interface JobRepository {
@@ -19,4 +20,5 @@ export interface JobRepository {
   claim(input: { limit: number }): Promise<JobRecord | undefined>;
   succeed(input: { workspaceId: WorkspaceId; jobId: JobId }): Promise<void>;
   fail(input: { workspaceId: WorkspaceId; jobId: JobId; errorCode: string }): Promise<void>;
+  requeueStaleRunning(input: { olderThanMs: number; now: IsoUtcTimestamp }): Promise<number>;
 }

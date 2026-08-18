@@ -74,6 +74,12 @@ export function createHttpApp(application: Application, options?: CreateHttpAppO
 
   app.get('/', (context) => {
     const html = options?.uiHtml ?? DEFAULT_UI_HTML;
+    if (configuredApiToken !== undefined && configuredApiToken.length > 0) {
+      context.header(
+        'set-cookie',
+        `brainledge_token=${encodeURIComponent(configuredApiToken)}; HttpOnly; SameSite=Strict; Path=/`,
+      );
+    }
     return context.html(html);
   });
 
@@ -143,6 +149,33 @@ export function createHttpApp(application: Application, options?: CreateHttpAppO
   return app;
 }
 
+const TOKEN_COOKIE = 'brainledge_token';
+
+function presentedApiToken(header: (name: string) => string | undefined): string | undefined {
+  const authorization = header('authorization');
+  if (authorization !== undefined && authorization.startsWith('Bearer ')) {
+    const bearer = authorization.slice('Bearer '.length);
+    if (bearer.length > 0) {
+      return bearer;
+    }
+  }
+  const cookie = header('cookie');
+  if (cookie === undefined || cookie.length === 0) {
+    return undefined;
+  }
+  for (const part of cookie.split(';')) {
+    const trimmed = part.trim();
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0) {
+      continue;
+    }
+    if (trimmed.slice(0, separator) === TOKEN_COOKIE) {
+      return decodeURIComponent(trimmed.slice(separator + 1));
+    }
+  }
+  return undefined;
+}
+
 function requireBearer(expectedTokenHash: string) {
   return async (
     context: {
@@ -152,12 +185,8 @@ function requireBearer(expectedTokenHash: string) {
     next: () => Promise<void>,
   ) => {
     const id = requestId(context.req.header(REQUEST_ID_HEADER));
-    const authorization = context.req.header('authorization');
-    if (authorization === undefined || !authorization.startsWith('Bearer ')) {
-      return context.json(errorBody('UNAUTHORIZED', 'Missing or invalid API token', id), 401);
-    }
-    const presented = authorization.slice('Bearer '.length);
-    if (!verifyLocalApiToken(presented, expectedTokenHash)) {
+    const presented = presentedApiToken((name) => context.req.header(name));
+    if (presented === undefined || !verifyLocalApiToken(presented, expectedTokenHash)) {
       return context.json(errorBody('UNAUTHORIZED', 'Missing or invalid API token', id), 401);
     }
     await next();

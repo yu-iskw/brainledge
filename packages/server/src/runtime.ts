@@ -10,6 +10,7 @@ import {
   localContext,
   runQueuedJobs,
   type Application,
+  type IngestLookup,
   type IngestionRepository,
   type JobRecord,
 } from '@brainledge/core';
@@ -18,6 +19,7 @@ import { serve } from '@hono/node-server';
 
 import { createHttpApp } from './http/app.js';
 import { DEFAULT_UI_HTML } from './http/default-ui.js';
+import { fetchPinnedIngestUrl } from './ingest/fetch-pinned.js';
 import { htmlToReadableText } from './ingest/html-to-text.js';
 import { readTextCapped } from './ingest/read-capped.js';
 import { defaultListenHost, defaultListenPort, prepareListen } from './listen.js';
@@ -57,6 +59,7 @@ export function loadUiHtml(explicit?: string): string {
 export function createStandaloneJobHandlers(
   application: Application,
   fetchImpl: typeof fetch = fetch,
+  lookup?: IngestLookup,
 ): Readonly<Record<string, (job: JobRecord) => Promise<void>>> {
   return {
     async consolidate(job) {
@@ -86,10 +89,13 @@ export function createStandaloneJobHandlers(
       }
       try {
         assertSafeIngestionUrl(payload.url);
-        const response = await fetchImpl(payload.url, {
-          redirect: 'error',
-          signal: AbortSignal.timeout(30_000),
-        });
+        const response =
+          fetchImpl === fetch
+            ? await fetchPinnedIngestUrl(payload.url, lookup)
+            : await fetchImpl(payload.url, {
+                redirect: 'error',
+                signal: AbortSignal.timeout(30_000),
+              });
         if (!response.ok) {
           throw new Error(`ingest-url HTTP ${String(response.status)}`);
         }
@@ -146,11 +152,23 @@ function isAborted(signal?: AbortSignal): boolean {
   return signal !== undefined && signal.aborted;
 }
 
+const STALE_RUNNING_MS = 60_000;
+
 export async function runStandaloneWorker(
   application: Application,
-  options?: { once?: boolean; pollMs?: number; fetchImpl?: typeof fetch; signal?: AbortSignal },
+  options?: {
+    once?: boolean;
+    pollMs?: number;
+    fetchImpl?: typeof fetch;
+    lookup?: IngestLookup;
+    signal?: AbortSignal;
+  },
 ): Promise<number> {
-  const handlers = createStandaloneJobHandlers(application, options?.fetchImpl);
+  await application.ports.jobs.requeueStaleRunning({
+    olderThanMs: STALE_RUNNING_MS,
+    now: application.ports.clock.now(),
+  });
+  const handlers = createStandaloneJobHandlers(application, options?.fetchImpl, options?.lookup);
   const once =
     options?.once === true ||
     (options?.signal === undefined && process.env.BRAINLEDGE_WORKER_ONCE === '1');

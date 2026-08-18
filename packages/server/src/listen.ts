@@ -14,8 +14,6 @@ export function prepareListen(): void {
     host: defaultListenHost(),
     port: defaultListenPort(),
     unsafeBind: process.env.BRAINLEDGE_UNSAFE_BIND === '1',
-    authenticationConfigured:
-      (apiToken !== undefined && apiToken.length > 0) ||
-      (process.env.OIDC_ISSUER !== undefined && process.env.OIDC_ISSUER.length > 0),
+    authenticationConfigured: apiToken !== undefined && apiToken.length > 0,
   });
 }

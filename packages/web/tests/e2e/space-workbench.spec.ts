@@ -23,7 +23,9 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
   await expect(page.locator('#memories-heading')).toBeVisible();
   await expect(page.locator('#overview-space')).not.toHaveText(TECHNICAL_ID);
   await expect(page.locator('#overview-principal')).toContainText(/This device/iu);
+  await expect(page.locator('#overview-principal')).toHaveCSS('text-transform', 'none');
   await expect(page.locator('#overview-principal')).not.toHaveText(TECHNICAL_ID);
+  await expect(page.locator('#overview-principal')).not.toHaveText(/PERSONAL/u);
   await expect(page.locator('#memory-list')).toContainText(/Nothing captured yet/iu);
   await page.screenshot({
     path: `${screenshotDir}/01-empty-or-loaded.png`,
@@ -47,6 +49,7 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
   await page.locator('#recall-input').fill(RECALL_QUERY);
   await page.locator('#recall-button').click();
   await expect(page.locator('#recall-output')).toHaveText(DANA_OR_CAFE);
+  await expect(page.locator('#recall-receipts')).toContainText(/Facts not extracted yet/iu);
   await expect(page.locator('#recall-memories')).toContainText(DANA_OR_CAFE);
   await page.screenshot({
     path: `${screenshotDir}/03-after-recall.png`,

@@ -12,6 +12,7 @@ import {
 import { createSqliteUnitOfWork, openSqliteDatabase } from './database.js';
 import { seedStandaloneIdentity } from './seed.js';
 import { createSqliteAuditRepository } from './sqlite-audit-repository.js';
+import { createSqliteDecisionRepository } from './sqlite-decision-repository.js';
 import { createSqliteEmbeddingStore } from './sqlite-embedding-store.js';
 import { createSqliteEntityRepository } from './sqlite-entity-repository.js';
 import { createSqliteEpisodeRepository } from './sqlite-episode-repository.js';
@@ -49,6 +50,7 @@ export function openStandalone(dataDir: string): StandaloneHandle {
     entities: createSqliteEntityRepository(database),
     embeddings: createSqliteEmbeddingStore(database),
     ingestions,
+    decisions: createSqliteDecisionRepository(database),
   });
   return {
     application,

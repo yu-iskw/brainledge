@@ -17,4 +17,5 @@ export interface EpisodeRepository {
   }): Promise<readonly Episode[]>;
   hide(input: { workspaceId: WorkspaceId; episodeId: EpisodeId }): Promise<void>;
   delete(input: { workspaceId: WorkspaceId; episodeId: EpisodeId }): Promise<void>;
+  purge(input: { workspaceId: WorkspaceId; episodeId: EpisodeId }): Promise<void>;
 }

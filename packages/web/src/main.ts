@@ -9,6 +9,7 @@ import {
   formatOperatorLabel,
   formatProvenanceLabel,
   formatSavedStatus,
+  formatWorkspaceName,
   humanizeEntityId,
   humanizePredicate,
   spaceInitial,
@@ -20,6 +21,8 @@ import { formatRecallFacts } from './recall-format.js';
 import { activateMode, bindWorkbenchTabs } from './shell.js';
 
 import type { GraphPalette } from './graph-draw.js';
+import type { LaidOutNode } from './graph-layout.js';
+import type { KnowledgeGraphEdge } from './graph-model.js';
 import type { GraphViewHandle } from './graph-view.js';
 import type {
   Entity,
@@ -106,6 +109,12 @@ function graphPalette(): GraphPalette {
   };
 }
 
+function graphCountLabel(nodeCount: number, edgeCount: number): string {
+  const nodes = `${String(nodeCount)} ${nodeCount === 1 ? 'node' : 'nodes'}`;
+  const edges = `${String(edgeCount)} ${edgeCount === 1 ? 'edge' : 'edges'}`;
+  return `${nodes} · ${edges}`;
+}
+
 function graphHost(): Window & { brainledgeGraph?: GraphViewHandle } {
   return window;
 }
@@ -124,8 +133,9 @@ function ensureGraphView(): GraphViewHandle {
         renderEpisodeList(TIMELINE_LIST_ID, state.timeline, EMPTY_TIMELINE_TITLE, EMPTY_TIMELINE);
       }
       const graph = buildKnowledgeGraph(state.facts, state.entities);
-      const counts = `${String(graph.nodes.length)} nodes · ${String(graph.edges.length)} edges`;
+      const counts = graphCountLabel(graph.nodes.length, graph.edges.length);
       setText('graph-caption', node === undefined ? counts : `${counts} · ${node.label}`);
+      renderGraphInspector(node);
     },
   );
   graphHost().brainledgeGraph = graphView;
@@ -140,10 +150,10 @@ function paintKnowledgeMap(): void {
   canvas.hidden = graph.nodes.length === 0;
   setText(
     'graph-caption',
-    graph.nodes.length === 0
-      ? ''
-      : `${String(graph.nodes.length)} nodes · ${String(graph.edges.length)} edges`,
+    graph.nodes.length === 0 ? '' : graphCountLabel(graph.nodes.length, graph.edges.length),
   );
+  renderGraphLegend(graph.edges);
+  renderGraphInspector(undefined);
   if (graph.nodes.length === 0) {
     return;
   }
@@ -152,6 +162,64 @@ function paintKnowledgeMap(): void {
       ensureGraphView().setGraph(graph.nodes, graph.edges);
     });
   });
+}
+
+function renderGraphLegend(edges: readonly KnowledgeGraphEdge[]): void {
+  const facts = document.getElementById('graph-legend-facts');
+  if (!(facts instanceof HTMLElement)) {
+    return;
+  }
+  const labels = [...new Set(edges.map((edge) => edge.label).filter((label) => label.length > 0))];
+  facts.textContent = labels.length === 0 ? 'Facts' : labels.slice(0, 4).join(', ');
+}
+
+function renderGraphInspector(node: LaidOutNode | undefined): void {
+  const root = byId<HTMLElement>('graph-inspector');
+  root.replaceChildren();
+  if (node === undefined) {
+    root.hidden = true;
+    return;
+  }
+  root.hidden = false;
+  const kind = document.createElement('p');
+  kind.className = 'eyebrow';
+  switch (node.kind) {
+    case 'entity': {
+      kind.textContent = 'Person';
+      break;
+    }
+    case 'literal': {
+      kind.textContent = 'Place or thing';
+      break;
+    }
+    default: {
+      const exhaustive: never = node.kind;
+      throw new Error(exhaustive);
+    }
+  }
+  const name = document.createElement('h3');
+  name.textContent = node.label;
+  const list = document.createElement('ul');
+  list.className = 'data-list';
+  const related = state.facts.filter((fact) => {
+    const subject = humanizeEntityId(fact.subject.entityId).toLowerCase();
+    const object = formatFactObject(fact.object).toLowerCase();
+    const label = node.label.toLowerCase();
+    return subject === label || object === label || fact.subject.entityId === node.id;
+  });
+  if (related.length === 0) {
+    const item = document.createElement('li');
+    item.className = 'meta';
+    item.textContent = 'No linked facts in this space.';
+    list.append(item);
+  } else {
+    for (const fact of related.slice(0, 8)) {
+      const item = document.createElement('li');
+      item.textContent = factSentence(fact);
+      list.append(item);
+    }
+  }
+  root.append(kind, name, list);
 }
 
 function setStatus(id: string, text: string): void {
@@ -225,7 +293,11 @@ function renderOverviewIdentity(): void {
   const principal = state.principal;
   const operator = formatOperatorLabel(principal?.type);
   const workspace = state.workspaces[0]?.name;
-  setText('overview-principal', workspace === undefined ? operator : `${operator} · ${workspace}`);
+  const workspaceLabel = workspace === undefined ? undefined : formatWorkspaceName(workspace);
+  setText(
+    'overview-principal',
+    workspaceLabel === undefined ? operator : `${operator} · ${workspaceLabel}`,
+  );
   const space = selectedSpace();
   const name = space?.name ?? 'Space';
   setText('overview-space', name);
@@ -248,7 +320,6 @@ function renderSpaceSelect(): void {
     const option = document.createElement('option');
     option.value = space.id;
     option.textContent = space.name;
-    option.title = space.id;
     option.selected = space.id === state.selectedSpaceId;
     select.append(option);
   }
@@ -281,7 +352,6 @@ function renderEpisodeList(
   }
   for (const episode of episodes) {
     const item = document.createElement('li');
-    item.title = episode.id;
     if (episode.id === state.selectedEpisodeId) {
       item.classList.add('selected');
     }
@@ -367,7 +437,6 @@ function renderGraph(): void {
   }
   for (const fact of state.facts) {
     const item = document.createElement('li');
-    item.title = fact.id;
     const triple = document.createElement('p');
     triple.textContent = factSentence(fact);
     const meta = document.createElement('div');
@@ -394,7 +463,12 @@ function renderRecallReceipts(result: RecallResult): void {
   const list = byId<HTMLUListElement>('recall-receipts');
   list.replaceChildren();
   if (result.facts.length === 0) {
-    appendEmptyState(list, 'No matching facts', EMPTY_RECEIPTS);
+    const title = result.memories.length > 0 ? 'Facts not extracted yet' : 'No matching facts';
+    const copy =
+      result.memories.length > 0
+        ? 'Open Inspect and extract facts to see receipts for this answer.'
+        : EMPTY_RECEIPTS;
+    appendEmptyState(list, title, copy);
     return;
   }
   for (const hit of result.facts) {
@@ -428,7 +502,6 @@ function renderProvenance(items: readonly ProvenanceItem[]): void {
       (episode) => episode.id === entry.episodeId,
     );
     item.textContent = formatProvenanceLabel(source?.content);
-    item.title = entry.episodeId;
     item.addEventListener('click', () => {
       state.selectedEpisodeId = entry.episodeId;
       activateMode('inspect');
@@ -600,7 +673,6 @@ async function remember(): Promise<void> {
     return;
   }
   setStatus(REMEMBER_STATUS_ID, formatSavedStatus());
-  byId<HTMLParagraphElement>(REMEMBER_STATUS_ID).title = result.episodeId;
   input.value = '';
   state.selectedEpisodeId = result.episodeId;
   await loadSpaceProjections();
@@ -608,7 +680,7 @@ async function remember(): Promise<void> {
 
 async function recall(): Promise<void> {
   const input = byId<HTMLInputElement>('recall-input');
-  const output = byId<HTMLPreElement>('recall-output');
+  const output = byId<HTMLElement>('recall-output');
   output.textContent = 'Searching…';
   const result = await safeCall(
     () =>
@@ -625,7 +697,13 @@ async function recall(): Promise<void> {
     return;
   }
   const memories = result.memories.map((hit) => hit.content).join('\n---\n');
-  output.textContent = memories.length > 0 ? memories : 'No memories found.';
+  if (result.facts.length > 0) {
+    output.textContent = formatRecallFacts(result.facts);
+  } else if (memories.length > 0) {
+    output.textContent = memories;
+  } else {
+    output.textContent = 'No memories found.';
+  }
   renderRecallMemories(result);
   renderRecallReceipts(result);
   renderProvenance(result.provenanceSummary ?? []);
@@ -644,7 +722,6 @@ function renderRecallMemories(result: RecallResult): void {
   }
   for (const hit of result.memories) {
     const item = document.createElement('li');
-    item.title = hit.episodeId;
     const content = document.createElement('p');
     content.textContent = hit.content;
     item.append(content);
@@ -673,7 +750,6 @@ async function pollIngestion(runId: string): Promise<void> {
     return;
   }
   setStatus(INGESTION_STATUS_ID, formatIngestStatus(result.status, result.segments));
-  byId<HTMLParagraphElement>(INGESTION_STATUS_ID).title = runId;
   if (INGESTION_TERMINAL_STATUSES.has(result.status)) {
     stopIngestionPoll();
     await loadSpaceProjections();
@@ -788,6 +864,16 @@ function bindEvents(): void {
   });
   byId<HTMLButtonElement>('graph-fit').addEventListener('click', () => {
     ensureGraphView().fit();
+  });
+  byId<HTMLInputElement>('graph-search').addEventListener('input', () => {
+    const query = byId<HTMLInputElement>('graph-search').value.trim().toLowerCase();
+    const graph = ensureGraphView();
+    if (query.length === 0) {
+      graph.focusNode(undefined);
+      return;
+    }
+    const match = graph.screenPositions().find((node) => node.label.toLowerCase().includes(query));
+    graph.focusNode(match?.id);
   });
   byId<HTMLButtonElement>('remember-button').addEventListener('click', () => {
     void remember();

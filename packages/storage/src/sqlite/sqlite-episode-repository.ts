@@ -148,5 +148,13 @@ export function createSqliteEpisodeRepository(database: DatabaseSync): EpisodeRe
         .run(episodeId, workspaceId);
       return Promise.resolve();
     },
+
+    purge({ workspaceId, episodeId }) {
+      database.prepare('DELETE FROM episode_fts WHERE episode_id = ?').run(episodeId);
+      database
+        .prepare('DELETE FROM episodes WHERE id = ? AND workspace_id = ?')
+        .run(episodeId, workspaceId);
+      return Promise.resolve();
+    },
   };
 }

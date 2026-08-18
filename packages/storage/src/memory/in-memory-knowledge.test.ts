@@ -1,5 +1,6 @@
 import {
   asEntityId,
+  asEpisodeId,
   asFactId,
   asKnowledgeSpaceId,
   asWorkspaceId,
@@ -115,6 +116,10 @@ describe('in-memory knowledge', () => {
         fact: sampleFact({ id: asFactId('fact_bad'), workspaceId: asWorkspaceId('ws_other') }),
       }),
     ).rejects.toThrow(WORKSPACE_SCOPE_MISMATCH);
+    await facts.purgeBySourceEpisode({
+      workspaceId: LOCAL_WORKSPACE_ID,
+      sourceEpisodeId: asEpisodeId('ep_missing'),
+    });
   });
 
   it('finds contradictory overlapping claims in the same space', async () => {

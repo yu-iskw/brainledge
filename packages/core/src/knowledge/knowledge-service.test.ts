@@ -27,6 +27,7 @@ function emptyJobs(): JobRepository {
     claim: () => Promise.resolve(undefined),
     succeed: () => Promise.resolve(),
     fail: () => Promise.resolve(),
+    requeueStaleRunning: () => Promise.resolve(0),
   };
 }
 
@@ -56,6 +57,7 @@ function knowledgeApp() {
     listRecent: ({ limit }) => Promise.resolve(episodes.slice(0, limit)),
     hide: () => Promise.resolve(),
     delete: () => Promise.resolve(),
+    purge: () => Promise.resolve(),
   };
   const evidenceRepo: EvidenceRepository = {
     insert: ({ evidence }) => {
@@ -64,6 +66,14 @@ function knowledgeApp() {
     },
     findById: ({ evidenceId }) =>
       Promise.resolve(evidenceItems.find((item) => item.id === evidenceId)),
+    purgeBySource: ({ sourceId }) => {
+      for (let index = evidenceItems.length - 1; index >= 0; index -= 1) {
+        if (evidenceItems[index]?.sourceId === sourceId) {
+          evidenceItems.splice(index, 1);
+        }
+      }
+      return Promise.resolve();
+    },
   };
   const factRepo: FactRepository = {
     insert: ({ fact }) => {
@@ -83,6 +93,14 @@ function knowledgeApp() {
     query: ({ limit }) =>
       Promise.resolve(facts.filter((item) => item.retractedAt === undefined).slice(0, limit)),
     findContradictions: () => Promise.resolve(findContradictoryPairs(facts)),
+    purgeBySourceEpisode: ({ sourceEpisodeId }) => {
+      for (let index = facts.length - 1; index >= 0; index -= 1) {
+        if (facts[index]?.sourceEpisodeId === sourceEpisodeId) {
+          facts.splice(index, 1);
+        }
+      }
+      return Promise.resolve();
+    },
   };
   const entityRepo: EntityRepository = {
     insert: ({ entity }) => {

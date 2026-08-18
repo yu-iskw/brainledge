@@ -45,6 +45,27 @@ describe('listen', () => {
     });
   });
 
+  it('refuses non-loopback bind when only OIDC_ISSUER is set', () => {
+    withEnv(
+      {
+        BRAINLEDGE_HOST: '0.0.0.0',
+        BRAINLEDGE_PORT: '8787',
+        BRAINLEDGE_UNSAFE_BIND: '1',
+        OIDC_ISSUER: 'https://issuer.example',
+        BRAINLEDGE_API_TOKEN: undefined,
+      },
+      () => {
+        let message = '';
+        try {
+          prepareListen();
+        } catch (error) {
+          message = error instanceof Error ? error.message : '';
+        }
+        expect(message).toMatch(/authentication/u);
+      },
+    );
+  });
+
   it('does not throw prepareListen on 127.0.0.1', () => {
     withEnv(
       {

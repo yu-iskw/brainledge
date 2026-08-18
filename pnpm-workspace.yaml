@@ -12,6 +12,8 @@ blockExoticSubdeps: true # explicit; matches v11 default
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+  playwright: true
+  '@playwright/test': true
 
 # Migrated from package.json#pnpm (pnpm 11 no longer reads that field)
 # Allow urgent patched versions blocked by the 7-day quarantine.

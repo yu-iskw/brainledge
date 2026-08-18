@@ -58,6 +58,7 @@ export type { Evidence, EvidenceSourceType, FactEvidence } from './knowledge/evi
 export {
   assertFactInvariant,
   deriveFactStatus,
+  factIdentityKey,
   factObjectKey,
   subjectPredicateKey,
 } from './knowledge/fact.js';
@@ -83,6 +84,7 @@ export type { AuditEvent, AuditRepository } from './ports/audit-repository.js';
 export { createMemoryService } from './memory/memory-service.js';
 export type { MemoryService } from './memory/memory-service.js';
 export type {
+  FactHit,
   ForgetInput,
   ForgetMode,
   MemoryHit,
@@ -157,7 +159,7 @@ export type {
 } from './plugins/p2-ports.js';
 export { extractTypedFacts } from './ingestion/extract.js';
 export { assertSafeIngestionUrl, assertSafeRelativePath } from './ingestion/ssrf.js';
-export { parseMarkdownDocument } from './ingestion/markdown.js';
+export { MAX_INGEST_BYTES, parseMarkdownDocument } from './ingestion/markdown.js';
 export { evaluateDatalog } from './reasoning/datalog.js';
 export type { DatalogRule, DatalogTuple } from './reasoning/datalog.js';
 export { parseRuleDsl } from './reasoning/rule-dsl.js';

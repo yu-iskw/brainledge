@@ -67,14 +67,12 @@ const COMMANDS: Record<string, CommandHandler> = {
   },
   async forget(rest) {
     console.log(
-      await cmdForget(
-        readPositional(rest, VALUE_FLAGS),
-        readFlag(rest, DATA_DIR_FLAG),
-        parseForgetMode(readFlag(rest, '--mode')),
-        readFlag(rest, '--server'),
-        undefined,
-        readFlag(rest, '--token'),
-      ),
+      await cmdForget(readPositional(rest, VALUE_FLAGS), {
+        dataDirFlag: readFlag(rest, DATA_DIR_FLAG),
+        mode: parseForgetMode(readFlag(rest, '--mode')),
+        serverUrl: readFlag(rest, '--server'),
+        apiToken: readFlag(rest, '--token'),
+      }),
     );
     return 0;
   },

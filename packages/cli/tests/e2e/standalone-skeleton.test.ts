@@ -22,7 +22,7 @@ describe('standalone skeleton e2e', () => {
     expect(await cmdConsolidate(dataDir)).toMatch(/consolidated/u);
     const second = await cmdRecall('Alice', dataDir);
     expect(second).toMatch(/Tokyo/u);
-    expect(await cmdForget(episodeId, dataDir, 'hide')).toMatch(/forgot/u);
+    expect(await cmdForget(episodeId, { dataDirFlag: dataDir, mode: 'hide' })).toMatch(/forgot/u);
     expect(await cmdRecall('Alice', dataDir)).toMatch(/No memories found/u);
   });
 });

@@ -47,6 +47,11 @@ describe('http app', () => {
       body: JSON.stringify({ content: 'Alice moved to Tokyo in July 2026.' }),
     });
     expect(remember.status).toBe(200);
+    const listed = await app.request('/api/v1/spaces/ks_default/memories');
+    expect(listed.status).toBe(200);
+    const listedBody = (await listed.json()) as { items: { content: string }[]; nextCursor: null };
+    expect(listedBody.items.some((item) => item.content.includes('Tokyo'))).toBe(true);
+    expect(listedBody.nextCursor).toBeNull();
     const recall = await app.request('/api/v1/spaces/ks_default/recall', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

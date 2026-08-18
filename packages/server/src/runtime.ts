@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   LOCAL_SPACE_ID,
+  MAX_INGEST_BYTES,
   asIngestionRunId,
   assertSafeIngestionUrl,
   localContext,
@@ -17,6 +18,8 @@ import { serve } from '@hono/node-server';
 
 import { createHttpApp } from './http/app.js';
 import { DEFAULT_UI_HTML } from './http/default-ui.js';
+import { htmlToReadableText } from './ingest/html-to-text.js';
+import { readTextCapped } from './ingest/read-capped.js';
 import { defaultListenHost, defaultListenPort, prepareListen } from './listen.js';
 
 function loadUiBundle(explicit?: string): { html: string; assetRoot?: string } {
@@ -83,11 +86,16 @@ export function createStandaloneJobHandlers(
       }
       try {
         assertSafeIngestionUrl(payload.url);
-        const response = await fetchImpl(payload.url);
+        const response = await fetchImpl(payload.url, {
+          redirect: 'error',
+          signal: AbortSignal.timeout(30_000),
+        });
         if (!response.ok) {
           throw new Error(`ingest-url HTTP ${String(response.status)}`);
         }
-        const markdown = await response.text();
+        const contentType = response.headers.get('content-type') ?? '';
+        const raw = await readTextCapped(response, MAX_INGEST_BYTES);
+        const markdown = htmlToReadableText(raw, contentType);
         await application.knowledge?.ingestMarkdown(ctx, {
           spaceId: payload.spaceId ?? LOCAL_SPACE_ID,
           markdown,
@@ -114,23 +122,51 @@ export function createStandaloneJobHandlers(
   };
 }
 
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (isAborted(signal)) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (isAborted(signal)) {
+      onAbort();
+    }
+  });
+}
+
+function isAborted(signal?: AbortSignal): boolean {
+  return signal !== undefined && signal.aborted;
+}
+
 export async function runStandaloneWorker(
   application: Application,
-  options?: { once?: boolean; pollMs?: number; fetchImpl?: typeof fetch },
+  options?: { once?: boolean; pollMs?: number; fetchImpl?: typeof fetch; signal?: AbortSignal },
 ): Promise<number> {
   const handlers = createStandaloneJobHandlers(application, options?.fetchImpl);
-  const once = options?.once === true || process.env.BRAINLEDGE_WORKER_ONCE === '1';
+  const once =
+    options?.once === true ||
+    (options?.signal === undefined && process.env.BRAINLEDGE_WORKER_ONCE === '1');
+  const signal = options?.signal;
   let total = 0;
   for (;;) {
+    if (isAborted(signal)) {
+      return total;
+    }
     const processed = await runQueuedJobs(application.ports.jobs, handlers);
     total += processed;
-    if (once) {
+    if (once || isAborted(signal)) {
       return total;
     }
     if (processed === 0) {
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, options?.pollMs ?? 1000);
-      });
+      await delay(options?.pollMs ?? 1000, signal);
     }
   }
 }
@@ -147,9 +183,20 @@ export function startStandaloneHttpServer(dataDir: string): { close: () => void 
   const hostname = defaultListenHost();
   const port = defaultListenPort();
   const server = serve({ fetch: app.fetch, hostname, port });
+  const workerAbort = new AbortController();
+  void runStandaloneWorker(handle.application, {
+    signal: workerAbort.signal,
+    pollMs: 1000,
+  }).catch((error: unknown) => {
+    if (workerAbort.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+      return;
+    }
+    console.error(error);
+  });
   console.log(`Brainledge listening on ${hostname}:${port}`);
   return {
     close() {
+      workerAbort.abort();
       server.close();
       handle.close();
     },

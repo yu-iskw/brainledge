@@ -15,6 +15,38 @@ import {
 
 const FIXED_TIME = parseIsoUtc('2026-08-18T00:00:00.000Z');
 
+function visibleEpisodes(
+  rows: Record<string, unknown>[],
+  workspaceId: unknown,
+  knowledgeSpaceId: unknown,
+): Record<string, unknown>[] {
+  return rows.filter(
+    (item) =>
+      item.workspace_id === workspaceId &&
+      item.knowledge_space_id === knowledgeSpaceId &&
+      item.hidden === false &&
+      item.deleted_at === null,
+  );
+}
+
+function newestFirst(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  return [...rows].sort((left, right) =>
+    String(right.observed_at).localeCompare(String(left.observed_at)),
+  );
+}
+
+function mutateEpisode(
+  rows: Record<string, unknown>[],
+  params: unknown[],
+  mutate: (row: Record<string, unknown>) => void,
+): void {
+  const [id, workspaceId] = params;
+  const row = rows.find((item) => item.id === id && item.workspace_id === workspaceId);
+  if (row !== undefined) {
+    mutate(row);
+  }
+}
+
 function createEpisodeTableEmulator(): { query: PostgresQueryFn; rows: Record<string, unknown>[] } {
   const rows: Record<string, unknown>[] = [];
 
@@ -50,16 +82,8 @@ function createEpisodeTableEmulator(): { query: PostgresQueryFn; rows: Record<st
     if (normalized.includes('content ilike')) {
       const [workspaceId, knowledgeSpaceId, pattern, limit] = params;
       const needle = String(pattern).replace(/%/gu, '').toLowerCase();
-      const matched = rows
-        .filter(
-          (item) =>
-            item.workspace_id === workspaceId &&
-            item.knowledge_space_id === knowledgeSpaceId &&
-            item.hidden === false &&
-            item.deleted_at === null &&
-            String(item.content).toLowerCase().includes(needle),
-        )
-        .sort((left, right) => String(right.observed_at).localeCompare(String(left.observed_at)))
+      const matched = newestFirst(visibleEpisodes(rows, workspaceId, knowledgeSpaceId))
+        .filter((item) => String(item.content).toLowerCase().includes(needle))
         .slice(0, Number(limit));
       return Promise.resolve({ rows: matched });
     }
@@ -70,34 +94,24 @@ function createEpisodeTableEmulator(): { query: PostgresQueryFn; rows: Record<st
       !normalized.includes('ilike')
     ) {
       const [workspaceId, knowledgeSpaceId, limit] = params;
-      const matched = rows
-        .filter(
-          (item) =>
-            item.workspace_id === workspaceId &&
-            item.knowledge_space_id === knowledgeSpaceId &&
-            item.hidden === false &&
-            item.deleted_at === null,
-        )
-        .sort((left, right) => String(right.observed_at).localeCompare(String(left.observed_at)))
-        .slice(0, Number(limit));
+      const matched = newestFirst(visibleEpisodes(rows, workspaceId, knowledgeSpaceId)).slice(
+        0,
+        Number(limit),
+      );
       return Promise.resolve({ rows: matched });
     }
 
     if (normalized.startsWith('update episodes set hidden = true')) {
-      const [id, workspaceId] = params;
-      const row = rows.find((item) => item.id === id && item.workspace_id === workspaceId);
-      if (row !== undefined) {
+      mutateEpisode(rows, params, (row) => {
         row.hidden = true;
-      }
+      });
       return Promise.resolve({ rows: [] });
     }
 
     if (normalized.startsWith('update episodes set deleted_at')) {
-      const [id, workspaceId] = params;
-      const row = rows.find((item) => item.id === id && item.workspace_id === workspaceId);
-      if (row !== undefined) {
+      mutateEpisode(rows, params, (row) => {
         row.deleted_at = new Date().toISOString();
-      }
+      });
       return Promise.resolve({ rows: [] });
     }
 

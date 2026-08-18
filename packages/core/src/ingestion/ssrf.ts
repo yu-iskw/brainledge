@@ -6,7 +6,60 @@ function isPrivateIpv4(hostname: string): boolean {
     return false;
   }
   const [a, b] = parts as [number, number, number, number];
-  return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254)
+  );
+}
+
+function normalizeHostname(hostname: string): string {
+  const lower = hostname.toLowerCase();
+  return lower.startsWith('[') && lower.endsWith(']') ? lower.slice(1, -1) : lower;
+}
+
+function ipv4MappedToDotted(host: string): string | undefined {
+  const dotted = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/u.exec(host);
+  if (dotted?.[1] !== undefined) {
+    return dotted[1];
+  }
+  const hex = /^::ffff:([0-9a-f]+):([0-9a-f]+)$/u.exec(host);
+  if (hex === null) {
+    return undefined;
+  }
+  const high = Number.parseInt(hex[1], 16);
+  const low = Number.parseInt(hex[2], 16);
+  if (Number.isNaN(high) || Number.isNaN(low)) {
+    return undefined;
+  }
+  return `${String((high >> 8) & 255)}.${String(high & 255)}.${String((low >> 8) & 255)}.${String(low & 255)}`;
+}
+
+function isBlockedHost(rawHostname: string): boolean {
+  const hostname = normalizeHostname(rawHostname);
+  if (
+    BLOCKED_HOSTS.has(hostname) ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal')
+  ) {
+    return true;
+  }
+  const mapped = ipv4MappedToDotted(hostname);
+  if (mapped !== undefined) {
+    return isPrivateIpv4(mapped);
+  }
+  if (hostname.includes(':')) {
+    return (
+      hostname === '::' ||
+      hostname === '::1' ||
+      hostname.startsWith('fe80:') ||
+      hostname.startsWith('fc') ||
+      hostname.startsWith('fd')
+    );
+  }
+  return isPrivateIpv4(hostname);
 }
 
 export function assertSafeIngestionUrl(raw: string): URL {
@@ -19,13 +72,7 @@ export function assertSafeIngestionUrl(raw: string): URL {
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
     throw new Error('INGEST_URL_PROTOCOL');
   }
-  const host = parsed.hostname.toLowerCase();
-  if (
-    BLOCKED_HOSTS.has(host) ||
-    host.endsWith('.local') ||
-    host.endsWith('.internal') ||
-    isPrivateIpv4(host)
-  ) {
+  if (isBlockedHost(parsed.hostname.toLowerCase())) {
     throw new Error('INGEST_URL_SSRF');
   }
   return parsed;

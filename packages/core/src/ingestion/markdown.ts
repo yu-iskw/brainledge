@@ -1,4 +1,4 @@
-const MAX_INGEST_BYTES = 1_000_000;
+export const MAX_INGEST_BYTES = 1_000_000;
 
 export function parseMarkdownDocument(raw: string): {
   readonly title: string;
@@ -15,5 +15,10 @@ export function parseMarkdownDocument(raw: string): {
     .split(/\n{2,}/u)
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
-  return { title, segments: segments.length === 0 ? [normalized] : segments };
+  const body = segments.filter((part) => !isHeadingOnlySegment(part));
+  return { title, segments: body.length === 0 ? segments : body };
+}
+
+function isHeadingOnlySegment(part: string): boolean {
+  return /^#{1,6}\s+\S[^\n]*$/u.test(part);
 }

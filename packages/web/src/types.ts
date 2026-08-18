@@ -36,6 +36,9 @@ export interface MemoryHit {
 export interface FactHit {
   readonly factId?: string;
   readonly summary: string;
+  readonly subjectId?: string;
+  readonly predicateId?: string;
+  readonly objectText?: string;
 }
 
 export interface ProvenanceItem {
@@ -56,6 +59,10 @@ export interface Fact {
     | { readonly kind: 'entity'; readonly entity: { readonly entityId: string } }
     | { readonly kind: string; readonly value: string | number | boolean };
   readonly status?: string;
+  readonly validFrom?: string;
+  readonly validUntil?: string;
+  readonly assertedAt?: string;
+  readonly sourceEpisodeId?: string;
 }
 
 export interface RecallResult {

@@ -6,6 +6,7 @@ import { extractTypedFacts } from '../ingestion/extract.js';
 import { parseMarkdownDocument } from '../ingestion/markdown.js';
 
 import { findContradictoryPairs } from './contradictions.js';
+import { factIdentityKey, subjectPredicateKey } from './fact.js';
 import { normalizeAlias } from './resolution.js';
 import { supersedeFact } from './supersede.js';
 
@@ -13,6 +14,8 @@ import type { Entity } from './entity.js';
 import type { Fact } from './fact.js';
 import type { ProvenanceEdge } from './provenance.js';
 import type { Authorizer, ExecutionContext } from '../auth/authorizer.js';
+import type { EntityId, EpisodeId, KnowledgeSpaceId, WorkspaceId } from '../domain/ids.js';
+import type { IsoUtcTimestamp } from '../domain/time.js';
 import type { Clock } from '../ports/clock.js';
 import type { EntityRepository } from '../ports/entity-repository.js';
 import type { EpisodeRepository } from '../ports/episode-repository.js';
@@ -42,6 +45,88 @@ export interface KnowledgeService {
 
 const SPACE_RESOURCE = 'space' as const;
 const KNOWLEDGE_READ = 'knowledge.read' as const;
+const FUNCTIONAL_PREDICATES = new Set(['livesIn']);
+
+async function persistExtractedFact(input: {
+  fact: Fact;
+  episodeId: EpisodeId;
+  workspaceId: WorkspaceId;
+  spaceId: KnowledgeSpaceId;
+  now: IsoUtcTimestamp;
+  entities: EntityRepository;
+  facts: FactRepository;
+  factsBySpo: Map<string, Fact>;
+  functionalBySp: Map<string, Fact>;
+}): Promise<boolean> {
+  const named = input.fact.subject.entityId.replace(/^ent_/u, '');
+  const displayName = named.charAt(0).toUpperCase() + named.slice(1);
+  const existingEntity = await input.entities.findByAlias({
+    workspaceId: input.workspaceId,
+    knowledgeSpaceId: input.spaceId,
+    normalizedValue: normalizeAlias(displayName),
+  });
+  const entityId = existingEntity?.id ?? input.fact.subject.entityId;
+  if (existingEntity === undefined) {
+    await input.entities.insert({
+      workspaceId: input.workspaceId,
+      entity: {
+        id: entityId,
+        workspaceId: input.workspaceId,
+        knowledgeSpaceId: input.spaceId,
+        canonicalName: displayName,
+        typeIds: ['Person'],
+        createdAt: input.now,
+      },
+    });
+    await input.entities.addAlias({
+      workspaceId: input.workspaceId,
+      alias: {
+        entityId,
+        value: displayName,
+        normalizedValue: normalizeAlias(displayName),
+      },
+    });
+  }
+  const identity = factIdentityKey(entityId, input.fact.predicate.id, input.fact.object);
+  if (input.factsBySpo.has(identity)) {
+    return false;
+  }
+  const nextFact: Fact = {
+    ...input.fact,
+    id: asFactId(newId('fact')),
+    subject: { entityId },
+    sourceEpisodeId: input.episodeId,
+  };
+  if (FUNCTIONAL_PREDICATES.has(input.fact.predicate.id)) {
+    await closePreviousFunctional(input, entityId, nextFact);
+    input.functionalBySp.set(subjectPredicateKey(entityId, input.fact.predicate.id), nextFact);
+  }
+  await input.facts.insert({ workspaceId: input.workspaceId, fact: nextFact });
+  input.factsBySpo.set(identity, nextFact);
+  return true;
+}
+
+async function closePreviousFunctional(
+  input: {
+    workspaceId: WorkspaceId;
+    now: IsoUtcTimestamp;
+    facts: FactRepository;
+    factsBySpo: Map<string, Fact>;
+    functionalBySp: Map<string, Fact>;
+  },
+  entityId: EntityId,
+  nextFact: Fact,
+): Promise<void> {
+  const previous = input.functionalBySp.get(subjectPredicateKey(entityId, nextFact.predicate.id));
+  if (previous === undefined) {
+    return;
+  }
+  const { previous: closed } = supersedeFact(previous, nextFact, input.now);
+  await input.facts.upsert({ workspaceId: input.workspaceId, fact: closed });
+  input.factsBySpo.delete(
+    factIdentityKey(previous.subject.entityId, previous.predicate.id, previous.object),
+  );
+}
 
 export function createKnowledgeService(deps: {
   authorizer: Authorizer;
@@ -61,11 +146,15 @@ export function createKnowledgeService(deps: {
         input.spaceId,
       );
       const spaceId = asKnowledgeSpaceId(input.spaceId);
-      const episodes = await deps.episodes.listRecent({
-        workspaceId: context.workspaceId,
-        knowledgeSpaceId: spaceId,
-        limit: 100,
-      });
+      const episodes = (
+        await deps.episodes.listRecent({
+          workspaceId: context.workspaceId,
+          knowledgeSpaceId: spaceId,
+          limit: 100,
+        })
+      )
+        .slice()
+        .sort((left, right) => left.observedAt.localeCompare(right.observedAt));
       let factCount = 0;
       const now = deps.clock.now();
       const existingFacts = await deps.facts.query({
@@ -73,10 +162,17 @@ export function createKnowledgeService(deps: {
         knowledgeSpaceId: spaceId,
         limit: 200,
       });
-      const factsByKey = new Map(
-        existingFacts
-          .filter((item) => item.retractedAt === undefined)
-          .map((item) => [`${item.subject.entityId}:${item.predicate.id}`, item]),
+      const activeFacts = existingFacts.filter((item) => item.retractedAt === undefined);
+      const factsBySpo = new Map(
+        activeFacts.map((item) => [
+          factIdentityKey(item.subject.entityId, item.predicate.id, item.object),
+          item,
+        ]),
+      );
+      const functionalBySp = new Map(
+        activeFacts
+          .filter((item) => FUNCTIONAL_PREDICATES.has(item.predicate.id))
+          .map((item) => [subjectPredicateKey(item.subject.entityId, item.predicate.id), item]),
       );
       await deps.unitOfWork.run(async () => {
         for (const episode of episodes) {
@@ -84,49 +180,20 @@ export function createKnowledgeService(deps: {
             principalId: context.principal.id,
           });
           for (const fact of extracted) {
-            const named = fact.subject.entityId.replace(/^ent_/u, '');
-            const displayName = named.charAt(0).toUpperCase() + named.slice(1);
-            const existingEntity = await deps.entities.findByAlias({
+            const inserted = await persistExtractedFact({
+              fact,
+              episodeId: episode.id,
               workspaceId: context.workspaceId,
-              knowledgeSpaceId: spaceId,
-              normalizedValue: normalizeAlias(displayName),
+              spaceId,
+              now,
+              entities: deps.entities,
+              facts: deps.facts,
+              factsBySpo,
+              functionalBySp,
             });
-            const entityId = existingEntity?.id ?? fact.subject.entityId;
-            if (existingEntity === undefined) {
-              await deps.entities.insert({
-                workspaceId: context.workspaceId,
-                entity: {
-                  id: entityId,
-                  workspaceId: context.workspaceId,
-                  knowledgeSpaceId: spaceId,
-                  canonicalName: displayName,
-                  typeIds: ['Person'],
-                  createdAt: now,
-                },
-              });
-              await deps.entities.addAlias({
-                workspaceId: context.workspaceId,
-                alias: {
-                  entityId,
-                  value: displayName,
-                  normalizedValue: normalizeAlias(displayName),
-                },
-              });
+            if (inserted) {
+              factCount += 1;
             }
-            const previous = factsByKey.get(`${entityId}:${fact.predicate.id}`);
-            const nextFact: Fact = {
-              ...fact,
-              id: asFactId(newId('fact')),
-              subject: { entityId },
-              sourceEpisodeId: episode.id,
-            };
-            if (previous !== undefined) {
-              const { previous: closed } = supersedeFact(previous, nextFact, now);
-              await deps.facts.upsert({ workspaceId: context.workspaceId, fact: closed });
-            }
-            await deps.facts.insert({ workspaceId: context.workspaceId, fact: nextFact });
-            factsByKey.set(`${entityId}:${fact.predicate.id}`, nextFact);
-            factCount += 1;
           }
         }
       });

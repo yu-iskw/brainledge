@@ -120,7 +120,7 @@ describe('import export migrate', () => {
       return Promise.resolve(new Response(JSON.stringify({ factCount: 3 }), { status: 200 }));
     };
     const serverUrl = 'http://127.0.0.1:8787';
-    expect(await cmdForget('ep_remote_1', undefined, 'hide', serverUrl, fetchImpl)).toMatch(
+    expect(await cmdForget('ep_remote_1', { mode: 'hide', serverUrl, fetchImpl })).toMatch(
       /forgot ep_remote_1/u,
     );
     expect(calls[0]).toEqual({

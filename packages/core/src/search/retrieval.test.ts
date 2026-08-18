@@ -44,6 +44,24 @@ describe('retrieval helpers', () => {
     ]);
     expect(retrieve({ query: 'Bob', episodes: [], facts }).factIds).toEqual([]);
     expect(retrieve({ query: 'Tokyo', episodes: [], facts }).factIds).toEqual(['f1']);
+    const carol: Fact = {
+      id: asFactId('f2'),
+      workspaceId: asWorkspaceId('ws_personal'),
+      knowledgeSpaceId: asKnowledgeSpaceId('ks_default'),
+      subject: { entityId: asEntityId('carol') },
+      predicate: { id: 'livesIn' },
+      object: { kind: 'text', value: 'Paris' },
+      assertedAt: parseIsoUtc('2026-08-18T00:00:00.000Z'),
+      status: 'active',
+      createdBy: { principalId: asPrincipalId('principal_local-user') },
+    };
+    expect(
+      retrieve({
+        query: 'Where does Alice live?',
+        episodes: [],
+        facts: [...facts, carol],
+      }).factIds,
+    ).toEqual(['f1']);
     expect(documentedCosineLimits().hard).toBeGreaterThan(documentedCosineLimits().soft);
   });
 });

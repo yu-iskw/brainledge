@@ -74,3 +74,7 @@ export function apiPost<T>(path: string, payload: unknown): Promise<T> {
     body: JSON.stringify(payload),
   });
 }
+
+export function apiDelete<T>(path: string): Promise<T> {
+  return apiFetch<T>(path, { method: 'DELETE' });
+}

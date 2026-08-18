@@ -10,10 +10,14 @@ import { passthroughUnitOfWork } from '../ports/unit-of-work.js';
 
 import { createApplication } from './create-application.js';
 
+import type { Entity, EntityAlias } from '../knowledge/entity.js';
 import type { Episode } from '../knowledge/episode.js';
 import type { Evidence } from '../knowledge/evidence.js';
+import type { Fact } from '../knowledge/fact.js';
+import type { EntityRepository } from '../ports/entity-repository.js';
 import type { EpisodeRepository } from '../ports/episode-repository.js';
 import type { EvidenceRepository } from '../ports/evidence-repository.js';
+import type { FactRepository } from '../ports/fact-repository.js';
 import type { JobRepository } from '../ports/job-repository.js';
 import type { SpaceRepository } from '../ports/space-repository.js';
 
@@ -92,6 +96,58 @@ function memoryRepos(): { episodes: EpisodeRepository; evidence: EvidenceReposit
   };
 }
 
+function knowledgeRepos(): {
+  episodes: EpisodeRepository;
+  evidence: EvidenceRepository;
+  facts: FactRepository;
+  entities: EntityRepository;
+} {
+  const base = memoryRepos();
+  const storedFacts: Fact[] = [];
+  const entities: Entity[] = [];
+  const aliases: EntityAlias[] = [];
+  return {
+    ...base,
+    facts: {
+      insert: ({ fact }) => {
+        storedFacts.push(fact);
+        return Promise.resolve();
+      },
+      upsert: ({ fact }) => {
+        const index = storedFacts.findIndex((item) => item.id === fact.id);
+        if (index >= 0) {
+          storedFacts[index] = fact;
+        } else {
+          storedFacts.push(fact);
+        }
+        return Promise.resolve();
+      },
+      findById: ({ factId }) => Promise.resolve(storedFacts.find((item) => item.id === factId)),
+      query: ({ limit }) =>
+        Promise.resolve(
+          storedFacts.filter((item) => item.retractedAt === undefined).slice(0, limit),
+        ),
+      findContradictions: () => Promise.resolve([]),
+    },
+    entities: {
+      insert: ({ entity }) => {
+        entities.push(entity);
+        return Promise.resolve();
+      },
+      findById: ({ entityId }) => Promise.resolve(entities.find((item) => item.id === entityId)),
+      findByAlias: ({ normalizedValue }) =>
+        Promise.resolve(
+          entities.find((item) => item.canonicalName.toLowerCase() === normalizedValue),
+        ),
+      addAlias: ({ alias }) => {
+        aliases.push(alias);
+        return Promise.resolve();
+      },
+      list: () => Promise.resolve(entities),
+    },
+  };
+}
+
 describe('createApplication', () => {
   it('rejects incompatible plugin API versions', () => {
     const repos = memoryRepos();
@@ -130,6 +186,77 @@ describe('createApplication', () => {
     });
     expect(result.memories[0]?.content).toMatch(/Tokyo/u);
     expect(LOCAL_WORKSPACE_ID).toBe('ws_personal');
+  });
+
+  it('recall maps retrieved factIds, includes the object, and limits provenance', async () => {
+    const repos = knowledgeRepos();
+    const app = createApplication({
+      clock: fixedClock(parseIsoUtc('2026-08-18T00:00:00.000Z')),
+      unitOfWork: passthroughUnitOfWork(),
+      authorizer: createLocalAuthorizer(),
+      episodes: repos.episodes,
+      evidence: repos.evidence,
+      spaces: emptySpaces(),
+      jobs: emptyJobs(),
+      facts: repos.facts,
+      entities: repos.entities,
+    });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Carol moved to Paris in June 2026.',
+    });
+    const consolidated = await app.memory.consolidate(localContext(), { spaceId: LOCAL_SPACE_ID });
+    expect(consolidated.factCount).toBe(2);
+
+    const tokyo = await app.memory.recall(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      query: 'Tokyo',
+    });
+    expect(tokyo.facts).toHaveLength(1);
+    expect(tokyo.facts[0]).toMatchObject({
+      subjectId: 'ent_alice',
+      predicateId: 'livesIn',
+      objectText: 'Tokyo',
+      summary: 'ent_alice livesIn Tokyo',
+    });
+    expect(tokyo.facts.some((fact) => fact.objectText === 'Paris')).toBe(false);
+    expect(tokyo.provenanceSummary.map((item) => item.episodeId)).toEqual(
+      tokyo.memories.map((memory) => memory.episodeId),
+    );
+    expect(tokyo.memories.every((memory) => memory.content.includes('Tokyo'))).toBe(true);
+
+    const alice = await app.memory.recall(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      query: 'Alice',
+    });
+    expect(alice.facts.map((fact) => fact.objectText)).toEqual(['Tokyo']);
+    expect(alice.facts.some((fact) => fact.objectText === 'Paris')).toBe(false);
+
+    const where = await app.memory.recall(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      query: 'Where does Alice live?',
+    });
+    expect(where.facts).toHaveLength(1);
+    expect(where.facts[0]?.summary).toBe('ent_alice livesIn Tokyo');
+    expect(where.facts[0]?.subjectId).toBe('ent_alice');
+    expect(where.facts.some((fact) => fact.objectText === 'Paris')).toBe(false);
+
+    const recent = await app.memory.recall(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      query: '',
+    });
+    expect([...recent.facts.map((fact) => fact.objectText)].sort()).toEqual(['Paris', 'Tokyo']);
+    expect(recent.provenanceSummary).toHaveLength(recent.memories.length);
+
+    const unrelated = await app.memory.recall(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      query: 'Zebra',
+    });
+    expect(unrelated.facts).toEqual([]);
   });
 
   it('stores embeddings when a provider is configured', async () => {

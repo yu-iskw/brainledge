@@ -25,6 +25,7 @@
     "knip": "knip",
     "codeql:local": "bash dev/codeql.sh",
     "test": "vitest run",
+    "test:e2e": "pnpm --filter @brainledge/web test:e2e",
     "coverage": "vitest run --coverage",
     "coverage:watch": "vitest --coverage"
   },

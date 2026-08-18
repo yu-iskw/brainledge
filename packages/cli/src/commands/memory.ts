@@ -130,14 +130,20 @@ export function parseForgetMode(raw: string | undefined): ForgetMode {
   throw new Error('forget --mode must be hide, delete, retract, or purge');
 }
 
+type ForgetCommandOptions = {
+  readonly dataDirFlag?: string;
+  readonly mode?: ForgetMode;
+  readonly serverUrl?: string;
+  readonly fetchImpl?: FetchImpl;
+  readonly apiToken?: string;
+};
+
 export async function cmdForget(
   memoryId: string,
-  dataDirFlag?: string,
-  mode: ForgetMode = 'hide',
-  serverUrl?: string,
-  fetchImpl?: FetchImpl,
-  apiToken?: string,
+  options: ForgetCommandOptions = {},
 ): Promise<string> {
+  const mode = options.mode ?? 'hide';
+  const { dataDirFlag, serverUrl, fetchImpl, apiToken } = options;
   if (memoryId.length === 0) {
     throw new Error('forget requires a memory id');
   }

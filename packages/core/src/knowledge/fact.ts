@@ -70,3 +70,11 @@ export function factObjectKey(object: FactObject): string {
 export function subjectPredicateKey(subject: EntityId, predicateId: string): string {
   return `${subject}|${predicateId}`;
 }
+
+export function factIdentityKey(
+  subject: EntityId,
+  predicateId: string,
+  object: FactObject,
+): string {
+  return `${subjectPredicateKey(subject, predicateId)}|${factObjectKey(object)}`;
+}

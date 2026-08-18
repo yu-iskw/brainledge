@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Coding agents will use MCP; humans and automation will use REST and the CLI. If each transport implements remember/recall/authz itself, tool catalogs drift, authorization is skipped on one path, and OpenAPI/MCP schemas disagree. Semantica’s serving gap is exactly this: a UI or protocol that does not call the same build path as the library.
+Coding agents will use MCP; humans and automation will use REST and the CLI. If each transport implements remember/recall/authz itself, tool catalogs drift, authorization is skipped on one path, and OpenAPI/MCP schemas disagree. That split is the historic Semantica lesson: a UI or protocol that does not call the same application services as the library.
 
 ## Decision
 

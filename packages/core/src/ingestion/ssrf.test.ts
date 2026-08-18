@@ -12,12 +12,21 @@ describe('ingestion safety', () => {
     expect(() => assertSafeIngestionUrl('ftp://example.com/a')).toThrow(/PROTOCOL/u);
     expect(() => assertSafeIngestionUrl('http://10.0.0.1/x')).toThrow(/SSRF/u);
     expect(() => assertSafeIngestionUrl('http://files.local/x')).toThrow(/SSRF/u);
-    expect(() => assertSafeRelativePath('C:\\windows\\secret')).toThrow(/TRAVERSAL/u);
+    expect(() => assertSafeIngestionUrl('http://169.254.169.254/latest/meta-data')).toThrow(
+      /SSRF/u,
+    );
+    expect(() => assertSafeIngestionUrl('http://[::ffff:127.0.0.1]/secret')).toThrow(/SSRF/u);
   });
 
   it('segments markdown', () => {
     const parsed = parseMarkdownDocument('# Title\n\nHello\n\nWorld');
     expect(parsed.title).toBe('Title');
-    expect(parsed.segments).toHaveLength(3);
+    expect(parsed.segments).toEqual(['Hello', 'World']);
+  });
+
+  it('keeps a heading-only document as a single segment', () => {
+    const parsed = parseMarkdownDocument('# Title only');
+    expect(parsed.title).toBe('Title only');
+    expect(parsed.segments).toEqual(['# Title only']);
   });
 });

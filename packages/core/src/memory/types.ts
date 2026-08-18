@@ -8,6 +8,12 @@ export interface MemoryHit {
 export interface FactHit {
   readonly factId: string;
   readonly summary: string;
+  readonly subjectId: string;
+  readonly predicateId: string;
+  readonly objectText: string;
+  readonly validFrom?: string;
+  readonly validUntil?: string;
+  readonly sourceEpisodeId?: string;
 }
 
 export interface EntityHit {

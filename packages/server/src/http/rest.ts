@@ -129,6 +129,15 @@ function registerSpaceRoutes(app: Hono, application: Application): void {
 }
 
 function registerMemoryRoutes(app: Hono, application: Application): void {
+  app.get('/api/v1/spaces/:spaceId/memories', async (context) => {
+    const items = await application.ports.episodes.listRecent({
+      workspaceId: localContext().workspaceId,
+      knowledgeSpaceId: asKnowledgeSpaceId(context.req.param('spaceId')),
+      limit: 50,
+    });
+    return context.json({ items, nextCursor: null });
+  });
+
   app.post('/api/v1/spaces/:spaceId/memories', async (context) => {
     const id = requestId(context.req.header(REQUEST_ID_HEADER));
     const parsed = rememberBody.safeParse(await context.req.json());

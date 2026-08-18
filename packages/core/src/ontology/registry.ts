@@ -17,7 +17,9 @@ export interface OntologyPort {
 }
 
 export function createInMemoryOntologyRegistry(
-  seed: readonly OntologyType[] = [{ id: 'Person', allowedPredicates: ['livesIn', 'knows'] }],
+  seed: readonly OntologyType[] = [
+    { id: 'Person', allowedPredicates: ['livesIn', 'knows', 'worksAt', 'taught', 'taughtIn'] },
+  ],
 ): OntologyPort {
   const bySpace = new Map<string, OntologyType[]>([['*', [...seed]]]);
   return {

@@ -6,9 +6,12 @@ import { AppError } from '../errors/app-error.js';
 import { retrieve } from '../search/retrieval.js';
 import { sessionEpisodes } from '../session/session-memory.js';
 
+import { toFactHit } from './fact-hit.js';
+
 import type { ForgetInput, RecallInput, RecallResult, RememberInput } from './types.js';
 import type { Authorizer, ExecutionContext } from '../auth/authorizer.js';
 import type { EpisodeKind } from '../knowledge/episode.js';
+import type { Fact } from '../knowledge/fact.js';
 import type { KnowledgeService } from '../knowledge/knowledge-service.js';
 import type { EmbeddingProvider } from '../models/providers.js';
 import type { Clock } from '../ports/clock.js';
@@ -131,6 +134,10 @@ export function createMemoryService(deps: {
           : retrieved.episodeIds
               .map((id) => episodes.find((episode) => episode.id === id))
               .filter((episode): episode is (typeof episodes)[number] => episode !== undefined);
+      const factsById = new Map<string, Fact>(facts.map((fact) => [fact.id, fact]));
+      const recalledFacts = retrieved.factIds
+        .map((factId) => factsById.get(factId))
+        .filter((fact): fact is Fact => fact !== undefined);
       return {
         memories: ordered.map((episode, index) => ({
           episodeId: episode.id,
@@ -138,14 +145,11 @@ export function createMemoryService(deps: {
           score: 1 / (index + 1),
           observedAt: episode.observedAt,
         })),
-        facts: facts.map((fact) => ({
-          factId: fact.id,
-          summary: `${fact.subject.entityId} ${fact.predicate.id}`,
-        })),
+        facts: recalledFacts.map(toFactHit),
         entities: [],
         priorDecisions: [],
         policies: [],
-        provenanceSummary: episodes.map((episode) => ({
+        provenanceSummary: ordered.map((episode) => ({
           episodeId: episode.id,
           relation: 'derived-from',
         })),

@@ -9,7 +9,7 @@ import {
 } from '../domain/ids.js';
 import { parseIsoUtc } from '../domain/time.js';
 
-import { assertFactInvariant, deriveFactStatus, factObjectKey } from './fact.js';
+import { assertFactInvariant, deriveFactStatus, factIdentityKey, factObjectKey } from './fact.js';
 
 import type { Fact } from './fact.js';
 
@@ -66,5 +66,8 @@ describe('fact invariants', () => {
     expect(factObjectKey({ kind: 'boolean', value: true })).toBe('boolean:true');
     expect(factObjectKey({ kind: 'number', value: 3 })).toBe('number:3');
     expect(factObjectKey({ kind: 'text', value: 'Tokyo' })).toBe('text:Tokyo');
+    expect(
+      factIdentityKey(asEntityId('ent_alice'), 'livesIn', { kind: 'text', value: 'Tokyo' }),
+    ).toBe('ent_alice|livesIn|text:Tokyo');
   });
 });

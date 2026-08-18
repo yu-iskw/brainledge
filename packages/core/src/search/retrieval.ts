@@ -65,14 +65,15 @@ export function retrieve(input: RetrievalInput): RetrievalOutput {
 }
 
 function factMatchesQuery(fact: Fact, tokens: readonly string[]): boolean {
-  const haystack = [
-    fact.subject.entityId,
-    fact.predicate.id,
-    fact.object.kind === 'entity' ? fact.object.entity.entityId : String(fact.object.value),
-  ]
-    .join(' ')
-    .toLowerCase();
-  return tokens.some((token) => haystack.includes(token));
+  const subject = fact.subject.entityId.toLowerCase();
+  const predicate = fact.predicate.id.toLowerCase();
+  const object =
+    fact.object.kind === 'entity'
+      ? fact.object.entity.entityId.toLowerCase()
+      : String(fact.object.value).toLowerCase();
+  return tokens.some(
+    (token) => subject.includes(token) || object.includes(token) || predicate === token,
+  );
 }
 
 function inferStrategy(query: string): RetrievalStrategy {

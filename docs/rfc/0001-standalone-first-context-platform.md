@@ -57,7 +57,7 @@ These decisions are **accepted** and must not be re-litigated in implementation 
 
 ## Revision log (defects fixed vs original RFC)
 
-The original RFC’s **direction is right**. Its **delivery shape would recreate Semantica’s serving gap**: many contracts, no coherent product path. This revision fixes:
+The original RFC’s **direction is right**. Its **delivery shape would recreate a library/product serving gap** (the historic Semantica lesson: many contracts, no coherent product path). This revision fixes:
 
 1. **P0 was three phases labeled as one.** Original P0-031..038 (OIDC, Compose, isolation e2e, production container) contradict “do not start enterprise before the standalone path is pleasant.” They move to Phase 3.
 2. **Undefined types.** `FactValue`, `EntityRef`, `PredicateRef`, `PrincipalRef` were used and never defined. They are locked below.
@@ -272,7 +272,7 @@ Commands: `init`, `serve`, `status`, `remember`, `recall`, `import`, `export`, `
 
 ### 6.5 `@brainledge/web`
 
-React/Vite UI for memory, recall, spaces, ingestion, later graph/provenance/timeline/decisions/admin. The standalone server serves the production build.
+Vanilla Vite + TypeScript UI for memory, recall, spaces, ingestion, later graph/provenance/timeline/decisions/admin. The standalone server serves the production build.
 
 ---
 
@@ -1365,7 +1365,7 @@ File: `packages/cli/tests/e2e/standalone-skeleton.test.ts`. Run with `pnpm --fil
 
 ## 39. Comparison against source projects
 
-- **Standalone individual mode** — first-class here; Cognee and Graphiti are strong; TrustGraph is heavier; Semantica has local potential but a serving gap.
+- **Standalone individual mode** — first-class here. Cognee is strong with embedded stores (SQLite/LanceDB/Ladybug) and a Next.js UI. Graphiti is strong for temporal graphs but is not zero-infra: it needs a graph database (Neo4j, FalkorDB, or Neptune). TrustGraph is heavier (Pulsar/RabbitMQ and Cassandra-class ops; Kafka is an alternate pub/sub backend). Semantica now ships a Vite/React/Sigma explorer and HTTP API; treat “serving gap” as a lesson about splitting library vs product, not as a complete description of current Semantica.
 - **Enterprise IAM** — first-class contracts here without making Kafka/Cassandra mandatory (TrustGraph lesson).
 - **Temporal facts** — Graphiti-like envelope on typed triples, persisted in SQL.
 - **Memory DX** — Cognee-like facade over one knowledge store.

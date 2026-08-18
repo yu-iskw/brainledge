@@ -81,6 +81,7 @@ export const openApiDocument = {
       delete: operation({ summary: 'delete space' }),
     },
     '/api/v1/spaces/{spaceId}/memories': {
+      get: operation({ summary: 'list memories', response: listResponse }),
       post: operation({ summary: 'remember', body: rememberBody }),
     },
     '/api/v1/spaces/{spaceId}/memories/{memoryId}': {

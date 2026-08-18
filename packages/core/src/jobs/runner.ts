@@ -2,6 +2,33 @@ import type { JobRecord, JobRepository } from '../ports/job-repository.js';
 
 type JobHandler = (job: JobRecord) => Promise<void>;
 
+async function settleClaimedJob(
+  jobs: JobRepository,
+  job: JobRecord,
+  handlers: Readonly<Partial<Record<string, JobHandler>>>,
+): Promise<void> {
+  const handler = handlers[job.type];
+  if (handler === undefined) {
+    await jobs.fail({
+      workspaceId: job.workspaceId,
+      jobId: job.id,
+      errorCode: 'UNKNOWN_JOB_TYPE',
+    });
+    return;
+  }
+  try {
+    await handler(job);
+    await jobs.succeed({ workspaceId: job.workspaceId, jobId: job.id });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    await jobs.fail({
+      workspaceId: job.workspaceId,
+      jobId: job.id,
+      errorCode: detail.length === 0 ? 'JOB_FAILED' : `JOB_FAILED:${detail.slice(0, 96)}`,
+    });
+  }
+}
+
 export async function runQueuedJobs(
   jobs: JobRepository,
   handlers: Readonly<Partial<Record<string, JobHandler>>>,
@@ -13,26 +40,7 @@ export async function runQueuedJobs(
     if (job === undefined) {
       return processed;
     }
-    const handler = handlers[job.type];
-    try {
-      if (handler === undefined) {
-        await jobs.fail({
-          workspaceId: job.workspaceId,
-          jobId: job.id,
-          errorCode: 'UNKNOWN_JOB_TYPE',
-        });
-      } else {
-        await handler(job);
-        await jobs.succeed({ workspaceId: job.workspaceId, jobId: job.id });
-      }
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      await jobs.fail({
-        workspaceId: job.workspaceId,
-        jobId: job.id,
-        errorCode: detail.length === 0 ? 'JOB_FAILED' : `JOB_FAILED:${detail.slice(0, 96)}`,
-      });
-    }
+    await settleClaimedJob(jobs, job, handlers);
     processed += 1;
   }
   return processed;

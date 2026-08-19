@@ -29,9 +29,9 @@ pnpm --filter @brainledge/cli exec node dist/main.js recall --data-dir /tmp/brai
 pnpm --filter @brainledge/cli exec node dist/main.js serve --data-dir /tmp/brainledge
 ```
 
-HTTP listens on `127.0.0.1:8787` (`GET /` is a remember/recall UI). MCP stdio: `brainledge mcp --data-dir /tmp/brainledge`. Remote CLI calls accept `--token` or `BRAINLEDGE_API_TOKEN`.
+HTTP listens on `127.0.0.1:8787` (`GET /` is a remember/recall UI). MCP stdio: `brainledge mcp --data-dir /tmp/brainledge`. Tools: `memory.remember`, `memory.recall` (facts + receipts), `memory.forget`, `knowledge.consolidate` (`dryRun` preview). Remote CLI calls accept `--token` or `BRAINLEDGE_API_TOKEN`.
 
-Phase 1 recall is lexical + recency over episode text, plus fact hits after `brainledge consolidate` (or `POST /api/v1/spaces/ks_default/consolidate`). `remember()` still does not extract.
+Phase 1 recall is lexical + recency over episode text, plus fact hits after `brainledge consolidate` (or `POST /api/v1/spaces/ks_default/consolidate`). `remember()` still does not extract. Optional LLM extract (behind regex) uses `BRAINLEDGE_LLM_BASE_URL` + `BRAINLEDGE_LLM_API_KEY`; no key keeps regex-only extract. Hybrid/vector recall, decisions UI, and export stay deferred.
 
 ### Packages
 

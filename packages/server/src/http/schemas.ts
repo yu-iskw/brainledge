@@ -23,6 +23,21 @@ export const ingestBody = z
     message: 'markdown or url required',
   });
 
+export const consolidateBody = z.object({
+  accept: z
+    .array(
+      z.object({
+        subjectId: z.string().min(1),
+        predicateId: z.string().min(1),
+        objectText: z.string().min(1),
+        sourceEpisodeId: z.string().min(1),
+        validFrom: z.string().optional(),
+        closes: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
 export const forgetQuery = z.object({
   mode: z.enum(['hide', 'delete', 'retract', 'purge']).optional(),
 });

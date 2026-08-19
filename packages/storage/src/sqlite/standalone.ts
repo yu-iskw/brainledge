@@ -10,6 +10,7 @@ import {
 } from '@brainledge/core';
 
 import { createSqliteUnitOfWork, openSqliteDatabase } from './database.js';
+import { textGenerationProviderFromEnv } from './model-env.js';
 import { seedStandaloneIdentity } from './seed.js';
 import { createSqliteAuditRepository } from './sqlite-audit-repository.js';
 import { createSqliteDecisionRepository } from './sqlite-decision-repository.js';
@@ -49,6 +50,7 @@ export function openStandalone(dataDir: string): StandaloneHandle {
     facts: createSqliteFactRepository(database),
     entities: createSqliteEntityRepository(database),
     embeddings: createSqliteEmbeddingStore(database),
+    textGenerationProvider: textGenerationProviderFromEnv(),
     ingestions,
     decisions: createSqliteDecisionRepository(database),
   });

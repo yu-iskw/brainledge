@@ -4,27 +4,37 @@ import { createOpenAiCompatibleProvider } from './openai-compatible.js';
 
 describe('openai-compatible provider', () => {
   it('posts chat completions through an injected fetch', async () => {
+    let chatBody = '';
     const provider = createOpenAiCompatibleProvider({
       baseUrl: 'https://api.example.test',
       apiKey: 'sk-test',
       model: 'gpt-test',
-      fetchImpl: (input) => {
+      fetchImpl: (input, init) => {
         const url =
           input instanceof URL ? input.href : typeof input === 'string' ? input : input.url;
         if (url.includes('/chat/completions')) {
-          return new Response(
-            JSON.stringify({
-              choices: [{ message: { content: 'ok' } }],
-              usage: { prompt_tokens: 1, completion_tokens: 1 },
-            }),
-            { status: 200 },
+          chatBody = typeof init?.body === 'string' ? init.body : '';
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                choices: [{ message: { content: 'ok' } }],
+                usage: { prompt_tokens: 1, completion_tokens: 1 },
+              }),
+              { status: 200 },
+            ),
           );
         }
-        return new Response(JSON.stringify({ data: [{ embedding: [0.1, 0.2] }] }), { status: 200 });
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: [{ embedding: [0.1, 0.2] }] }), { status: 200 }),
+        );
       },
     });
-    const generated = await provider.generate({ prompt: 'hi' });
+    const generated = await provider.generate({
+      prompt: 'hi',
+      jsonSchema: { type: 'object', properties: { facts: { type: 'array' } } },
+    });
     expect(generated.text).toBe('ok');
+    expect(chatBody).toMatch(/json_schema/u);
     const embedded = await provider.embed({ texts: ['hi'] });
     expect(embedded.vectors[0]).toEqual([0.1, 0.2]);
   });

@@ -2,7 +2,11 @@ import { authorizeOrThrow } from '../auth/authorize.js';
 import { newId, sha256 } from '../domain/hash.js';
 import { asEpisodeId, asFactId, asKnowledgeSpaceId } from '../domain/ids.js';
 import { parseIsoUtc } from '../domain/time.js';
-import { extractTypedFacts } from '../ingestion/extract.js';
+import {
+  createExtractedFact,
+  extractFactsWithLlm,
+  extractTypedFacts,
+} from '../ingestion/extract.js';
 import { parseMarkdownDocument } from '../ingestion/markdown.js';
 import { formatFactObject } from '../memory/fact-hit.js';
 import { formatFactSentence } from '../memory/format-fact-sentence.js';
@@ -18,6 +22,7 @@ import type { ProvenanceEdge } from './provenance.js';
 import type { Authorizer, ExecutionContext } from '../auth/authorizer.js';
 import type { EntityId, EpisodeId, KnowledgeSpaceId, WorkspaceId } from '../domain/ids.js';
 import type { IsoUtcTimestamp } from '../domain/time.js';
+import type { TextGenerationProvider } from '../models/providers.js';
 import type { Clock } from '../ports/clock.js';
 import type { EntityRepository } from '../ports/entity-repository.js';
 import type { EpisodeRepository } from '../ports/episode-repository.js';
@@ -29,13 +34,14 @@ export interface ProposedFact {
   readonly predicateId: string;
   readonly objectText: string;
   readonly sourceEpisodeId: string;
+  readonly validFrom?: string;
   readonly closes?: string;
 }
 
 export interface KnowledgeService {
   consolidate(
     context: ExecutionContext,
-    input: { spaceId: string },
+    input: { spaceId: string; accept?: readonly ProposedFact[] },
   ): Promise<{ factCount: number }>;
   previewExtract(
     context: ExecutionContext,
@@ -157,6 +163,121 @@ async function closePreviousFunctional(
   );
 }
 
+function unionExtractedFacts(regexFacts: readonly Fact[], llmFacts: readonly Fact[]): Fact[] {
+  const regexFunctional = new Set(
+    regexFacts
+      .filter((item) => FUNCTIONAL_PREDICATES.has(item.predicate.id))
+      .map((item) => subjectPredicateKey(item.subject.entityId, item.predicate.id)),
+  );
+  const extra = llmFacts.filter((item) => {
+    if (!FUNCTIONAL_PREDICATES.has(item.predicate.id)) {
+      return true;
+    }
+    return !regexFunctional.has(subjectPredicateKey(item.subject.entityId, item.predicate.id));
+  });
+  return [...regexFacts, ...extra];
+}
+
+async function factsFromEpisode(
+  deps: { textGenerationProvider?: TextGenerationProvider },
+  episode: { content: string },
+  context: ExecutionContext,
+  spaceId: KnowledgeSpaceId,
+  now: IsoUtcTimestamp,
+): Promise<readonly Fact[]> {
+  const regexFacts = extractTypedFacts(episode.content, context.workspaceId, spaceId, now, {
+    principalId: context.principal.id,
+  });
+  if (deps.textGenerationProvider === undefined) {
+    return regexFacts;
+  }
+  const llmFacts = await extractFactsWithLlm({
+    content: episode.content,
+    workspaceId: context.workspaceId,
+    spaceId,
+    now,
+    createdBy: { principalId: context.principal.id },
+    provider: deps.textGenerationProvider,
+  });
+  return unionExtractedFacts(regexFacts, llmFacts);
+}
+
+function factsFromAccepted(
+  accept: readonly ProposedFact[],
+  context: ExecutionContext,
+  spaceId: KnowledgeSpaceId,
+  now: IsoUtcTimestamp,
+): readonly { fact: Fact; episodeId: EpisodeId }[] {
+  return accept.map((item) => ({
+    fact: createExtractedFact({
+      subjectName: item.subjectId.replace(/^ent_/u, ''),
+      predicate: item.predicateId,
+      objectValue: item.objectText,
+      workspaceId: context.workspaceId,
+      spaceId,
+      now,
+      createdBy: { principalId: context.principal.id },
+      validFrom:
+        item.validFrom === undefined || item.validFrom.length === 0
+          ? undefined
+          : parseIsoUtc(item.validFrom),
+    }),
+    episodeId: asEpisodeId(item.sourceEpisodeId),
+  }));
+}
+
+async function extractCandidates(input: {
+  readonly deps: { textGenerationProvider?: TextGenerationProvider };
+  readonly episodes: readonly { id: EpisodeId; content: string }[];
+  readonly context: ExecutionContext;
+  readonly spaceId: KnowledgeSpaceId;
+  readonly now: IsoUtcTimestamp;
+  readonly accept: readonly ProposedFact[] | undefined;
+}): Promise<readonly { fact: Fact; episodeId: EpisodeId }[]> {
+  if (input.accept !== undefined) {
+    return factsFromAccepted(input.accept, input.context, input.spaceId, input.now);
+  }
+  const candidates: { fact: Fact; episodeId: EpisodeId }[] = [];
+  for (const episode of input.episodes) {
+    const extracted = await factsFromEpisode(
+      input.deps,
+      episode,
+      input.context,
+      input.spaceId,
+      input.now,
+    );
+    for (const fact of extracted) {
+      candidates.push({ fact, episodeId: episode.id });
+    }
+  }
+  return candidates;
+}
+
+function proposedFromPersist(
+  result: { inserted: boolean; nextFact?: Fact; closes?: Fact },
+  episodeId: EpisodeId,
+): ProposedFact | undefined {
+  if (!result.inserted || result.nextFact === undefined) {
+    return undefined;
+  }
+  return {
+    subjectId: result.nextFact.subject.entityId,
+    predicateId: result.nextFact.predicate.id,
+    objectText: formatFactObject(result.nextFact.object),
+    sourceEpisodeId: episodeId,
+    ...(result.nextFact.validFrom === undefined ? {} : { validFrom: result.nextFact.validFrom }),
+    closes:
+      result.closes === undefined
+        ? undefined
+        : formatFactSentence({
+            subjectId: result.closes.subject.entityId,
+            predicateId: result.closes.predicate.id,
+            objectText: formatFactObject(result.closes.object),
+            summary: `${result.closes.subject.entityId} ${result.closes.predicate.id}`,
+          }),
+  };
+}
+
 async function applyExtract(
   deps: {
     authorizer: Authorizer;
@@ -165,10 +286,12 @@ async function applyExtract(
     episodes: EpisodeRepository;
     facts: FactRepository;
     entities: EntityRepository;
+    textGenerationProvider?: TextGenerationProvider;
   },
   context: ExecutionContext,
   spaceIdInput: string,
   persist: boolean,
+  accept?: readonly ProposedFact[],
 ): Promise<{ factCount: number; proposed: ProposedFact[] }> {
   const spaceId = asKnowledgeSpaceId(spaceIdInput);
   const episodes = (
@@ -199,16 +322,21 @@ async function applyExtract(
       .filter((item) => FUNCTIONAL_PREDICATES.has(item.predicate.id))
       .map((item) => [subjectPredicateKey(item.subject.entityId, item.predicate.id), item]),
   );
+  const candidates = await extractCandidates({
+    deps,
+    episodes,
+    context,
+    spaceId,
+    now,
+    accept,
+  });
   const run = async (): Promise<void> => {
-    for (const episode of episodes) {
-      const extracted = extractTypedFacts(episode.content, context.workspaceId, spaceId, now, {
-        principalId: context.principal.id,
-      });
-      for (const fact of extracted) {
-        const result = await persistExtractedFact({
+    for (const { fact, episodeId } of candidates) {
+      const proposedFact = proposedFromPersist(
+        await persistExtractedFact({
           persist,
           fact,
-          episodeId: episode.id,
+          episodeId,
           workspaceId: context.workspaceId,
           spaceId,
           now,
@@ -216,24 +344,11 @@ async function applyExtract(
           facts: deps.facts,
           factsBySpo,
           functionalBySp,
-        });
-        if (result.inserted && result.nextFact !== undefined) {
-          proposed.push({
-            subjectId: result.nextFact.subject.entityId,
-            predicateId: result.nextFact.predicate.id,
-            objectText: formatFactObject(result.nextFact.object),
-            sourceEpisodeId: episode.id,
-            closes:
-              result.closes === undefined
-                ? undefined
-                : formatFactSentence({
-                    subjectId: result.closes.subject.entityId,
-                    predicateId: result.closes.predicate.id,
-                    objectText: formatFactObject(result.closes.object),
-                    summary: `${result.closes.subject.entityId} ${result.closes.predicate.id}`,
-                  }),
-          });
-        }
+        }),
+        episodeId,
+      );
+      if (proposedFact !== undefined) {
+        proposed.push(proposedFact);
       }
     }
   };
@@ -252,6 +367,7 @@ export function createKnowledgeService(deps: {
   episodes: EpisodeRepository;
   facts: FactRepository;
   entities: EntityRepository;
+  textGenerationProvider?: TextGenerationProvider;
 }): KnowledgeService {
   return {
     async consolidate(context, input) {
@@ -262,7 +378,7 @@ export function createKnowledgeService(deps: {
         SPACE_RESOURCE,
         input.spaceId,
       );
-      const result = await applyExtract(deps, context, input.spaceId, true);
+      const result = await applyExtract(deps, context, input.spaceId, true, input.accept);
       return { factCount: result.factCount };
     },
 

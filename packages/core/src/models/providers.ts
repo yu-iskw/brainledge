@@ -2,6 +2,7 @@ export interface GenerationRequest {
   readonly prompt: string;
   readonly model?: string;
   readonly timeoutMs?: number;
+  readonly jsonSchema?: Record<string, unknown>;
 }
 
 export interface GenerationResponse {

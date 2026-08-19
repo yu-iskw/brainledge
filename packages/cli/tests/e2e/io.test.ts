@@ -73,6 +73,36 @@ describe('import export migrate', () => {
       }),
     );
     expect(recalled).toMatch(/Tokyo/u);
+    const previewed = await cmdMcp(
+      dataDir,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: { name: 'knowledge.consolidate', arguments: { dryRun: true } },
+      }),
+    );
+    expect(previewed).toMatch(/preview/u);
+    expect(previewed).toMatch(/Tokyo/u);
+    await cmdMcp(
+      dataDir,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/call',
+        params: { name: 'knowledge.consolidate', arguments: { dryRun: false } },
+      }),
+    );
+    const factRecall = await cmdMcp(
+      dataDir,
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 5,
+        method: 'tools/call',
+        params: { name: 'memory.recall', arguments: { query: 'Where does Alice live?' } },
+      }),
+    );
+    expect(factRecall).toMatch(/Alice lives in Tokyo/u);
   });
 
   it('remembers and recalls via remote server URL with injected fetch', async () => {

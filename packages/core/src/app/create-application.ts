@@ -66,6 +66,7 @@ export function createApplication(ports: ApplicationPorts): Application {
           episodes: ports.episodes,
           facts: ports.facts,
           entities: ports.entities,
+          textGenerationProvider: ports.textGenerationProvider,
         });
   const resolved: ResolvedApplicationPorts = {
     ...ports,

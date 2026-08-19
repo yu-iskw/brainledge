@@ -117,6 +117,8 @@ function drawState(overrides: Partial<GraphDrawState> = {}): GraphDrawState {
     edges: [],
     camera: createCamera(),
     focusIds: new Set(),
+    highlightNodeIds: new Set(),
+    highlightEdgeIds: new Set(),
     ...overrides,
   };
 }
@@ -162,6 +164,24 @@ describe('drawKnowledgeGraph', () => {
     expect(strokeStyles).toContain(palette.accent);
     expect(strokeWidths).toContain(2.4);
     expect(fillTexts).toContain(livesIn.label);
+  });
+
+  it('strokes highlighted recall edges with accent', () => {
+    const { ctx, strokeStyles, strokeWidths } = recordingContext();
+    drawKnowledgeGraph(
+      ctx,
+      640,
+      400,
+      palette,
+      drawState({
+        nodes: [alice, tokyo],
+        edges: [livesIn],
+        highlightNodeIds: new Set([alice.id, tokyo.id]),
+        highlightEdgeIds: new Set([livesIn.id]),
+      }),
+    );
+    expect(strokeStyles).toContain(palette.accent);
+    expect(strokeWidths).toContain(2.4);
   });
 
   it('skips edges whose endpoints are missing', () => {

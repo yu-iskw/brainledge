@@ -421,6 +421,34 @@ describe('practical HTTP cases', () => {
       expect(factsIncludeObject(payload.facts, 'Tokyo')).toBe(true);
       expect(factsIncludeObject(payload.facts, 'Paris')).toBe(false);
     });
+
+    it('accepts a subset of proposed facts', async () => {
+      const app = createTestApp();
+      expect(
+        (
+          await postJson(app, MEMORIES_PATH, {
+            content: 'Alice moved to Tokyo in July 2026. Dana works at the cafe.',
+          })
+        ).status,
+      ).toBe(200);
+      const preview = await app.request(`/api/v1/spaces/${LOCAL_SPACE_ID}/consolidate?dryRun=1`, {
+        method: 'POST',
+      });
+      expect(preview.status).toBe(200);
+      const proposed = ((await preview.json()) as { proposed: { predicateId: string }[] }).proposed;
+      const alice: { predicateId: string }[] = [];
+      for (const item of proposed) {
+        if (item.predicateId === 'livesIn') {
+          alice.push(item);
+        }
+      }
+      expect(alice).toHaveLength(1);
+      const accepted = await postJson(app, `/api/v1/spaces/${LOCAL_SPACE_ID}/consolidate`, {
+        accept: alice,
+      });
+      expect(accepted.status).toBe(200);
+      expect(((await accepted.json()) as { factCount: number }).factCount).toBe(1);
+    });
   });
 
   describe('decisions', () => {
@@ -465,6 +493,14 @@ describe('practical HTTP cases', () => {
       });
       expect(response.status).toBe(200);
       expect(await response.text()).toMatch(/Tokyo/u);
+      const preview = await postJson(app, '/mcp', {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'knowledge.consolidate', arguments: { dryRun: true } },
+      });
+      expect(preview.status).toBe(200);
+      expect(await preview.text()).toMatch(/preview/u);
     });
   });
 

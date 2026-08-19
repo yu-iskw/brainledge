@@ -15,6 +15,7 @@ import type { Entity, EntityAlias } from '../knowledge/entity.js';
 import type { Episode } from '../knowledge/episode.js';
 import type { Evidence } from '../knowledge/evidence.js';
 import type { Fact } from '../knowledge/fact.js';
+import type { TextGenerationProvider } from '../models/providers.js';
 import type { EntityRepository } from '../ports/entity-repository.js';
 import type { EpisodeRepository } from '../ports/episode-repository.js';
 import type { EvidenceRepository } from '../ports/evidence-repository.js';
@@ -42,7 +43,7 @@ function emptySpaces(): SpaceRepository {
   };
 }
 
-function knowledgeApp() {
+function knowledgeApp(textGenerationProvider?: TextGenerationProvider) {
   const episodes: Episode[] = [];
   const evidenceItems: Evidence[] = [];
   const facts: Fact[] = [];
@@ -135,6 +136,7 @@ function knowledgeApp() {
     jobs: emptyJobs(),
     facts: factRepo,
     entities: entityRepo,
+    textGenerationProvider,
   });
   return { app, aliases };
 }
@@ -231,5 +233,169 @@ describe('knowledge consolidate', () => {
     const stillTokyo = await app.knowledge?.queryFacts(localContext(), { spaceId: LOCAL_SPACE_ID });
     expect(stillTokyo?.filter((item) => item.retractedAt === undefined)).toHaveLength(1);
     expect(stillTokyo?.[0]?.object).toEqual({ kind: 'text', value: 'Tokyo' });
+  });
+
+  it('persists only accepted proposed facts', async () => {
+    const { app } = knowledgeApp();
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026. Dana works at the cafe.',
+    });
+    const preview = await app.knowledge?.previewExtract(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+    });
+    expect(preview?.factCount).toBe(2);
+    const alice = preview?.proposed.find((item) => item.predicateId === 'livesIn');
+    expect(alice).toBeDefined();
+    const result = await app.memory.consolidate(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      accept: alice === undefined ? [] : [alice],
+    });
+    expect(result.factCount).toBe(1);
+    const queried = await app.knowledge?.queryFacts(localContext(), { spaceId: LOCAL_SPACE_ID });
+    const active = queried?.filter((item) => item.retractedAt === undefined) ?? [];
+    expect(active).toHaveLength(1);
+    expect(active[0]?.predicate.id).toBe('livesIn');
+    expect(alice?.validFrom).toBe('2026-07-01T00:00:00.000Z');
+    expect(active[0]?.validFrom).toBe('2026-07-01T00:00:00.000Z');
+  });
+
+  it('keeps world-time as-of when accepting a livesIn supersession', async () => {
+    const { app } = knowledgeApp();
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    const tokyoPreview = await app.knowledge?.previewExtract(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+    });
+    await app.memory.consolidate(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      accept: tokyoPreview?.proposed ?? [],
+    });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Paris in August 2026.',
+    });
+    const parisPreview = await app.knowledge?.previewExtract(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+    });
+    expect(parisPreview?.proposed[0]?.validFrom).toBe('2026-08-01T00:00:00.000Z');
+    await app.memory.consolidate(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      accept: parisPreview?.proposed ?? [],
+    });
+    const july = await app.knowledge?.queryFacts(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      asOf: '2026-07-15T23:59:59.000Z',
+    });
+    expect(july?.map((item) => (item.object.kind === 'text' ? item.object.value : ''))).toEqual([
+      'Tokyo',
+    ]);
+  });
+
+  it('keeps regex livesIn when the LLM proposes a different city', async () => {
+    const { app } = knowledgeApp({
+      generate: () =>
+        Promise.resolve({
+          text: JSON.stringify({
+            facts: [{ subject: 'Alice', predicate: 'livesIn', object: 'Paris' }],
+          }),
+          model: 'fake',
+        }),
+    });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    await app.memory.consolidate(localContext(), { spaceId: LOCAL_SPACE_ID });
+    const queried = await app.knowledge?.queryFacts(localContext(), { spaceId: LOCAL_SPACE_ID });
+    const active = queried?.filter((item) => item.retractedAt === undefined) ?? [];
+    expect(active).toHaveLength(1);
+    expect(active[0]?.object).toEqual({ kind: 'text', value: 'Tokyo' });
+  });
+
+  it('merges LLM facts behind regex extract', async () => {
+    const { app } = knowledgeApp({
+      generate: () =>
+        Promise.resolve({
+          text: JSON.stringify({
+            facts: [{ subject: 'Alice', predicate: 'knows', object: 'Carol' }],
+          }),
+          model: 'fake',
+        }),
+    });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    await app.memory.consolidate(localContext(), { spaceId: LOCAL_SPACE_ID });
+    const queried = await app.knowledge?.queryFacts(localContext(), { spaceId: LOCAL_SPACE_ID });
+    const predicates = queried?.map((item) => item.predicate.id).sort();
+    expect(predicates).toEqual(['knows', 'livesIn']);
+  });
+
+  it('does not call text generation during remember', async () => {
+    let generateCalls = 0;
+    const { app } = knowledgeApp({
+      generate: () => {
+        generateCalls += 1;
+        return Promise.reject(new Error('LLM should not run on remember'));
+      },
+    });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    expect(generateCalls).toBe(0);
+    const recalled = await app.memory.recall(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      query: 'Alice',
+    });
+    expect(recalled.memories[0]?.content).toMatch(/Tokyo/u);
+  });
+
+  it('keeps regex facts when the LLM provider throws', async () => {
+    const { app } = knowledgeApp({
+      generate: () => Promise.reject(new Error('provider down')),
+    });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    const result = await app.memory.consolidate(localContext(), { spaceId: LOCAL_SPACE_ID });
+    expect(result.factCount).toBe(1);
+  });
+
+  it('does not call the LLM when persisting an accept list', async () => {
+    let generateCalls = 0;
+    const { app } = knowledgeApp({
+      generate: () => {
+        generateCalls += 1;
+        return Promise.resolve({
+          text: JSON.stringify({
+            facts: [{ subject: 'Alice', predicate: 'knows', object: 'Carol' }],
+          }),
+          model: 'fake',
+        });
+      },
+    });
+    await app.memory.remember(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      content: 'Alice moved to Tokyo in July 2026.',
+    });
+    const preview = await app.knowledge?.previewExtract(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+    });
+    expect(generateCalls).toBe(1);
+    const accepted = preview?.proposed ?? [];
+    expect(accepted.some((item) => item.predicateId === 'knows')).toBe(true);
+    generateCalls = 0;
+    const result = await app.memory.consolidate(localContext(), {
+      spaceId: LOCAL_SPACE_ID,
+      accept: accepted,
+    });
+    expect(generateCalls).toBe(0);
+    expect(result.factCount).toBe(2);
   });
 });

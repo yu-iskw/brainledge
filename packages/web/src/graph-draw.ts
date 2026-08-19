@@ -22,14 +22,19 @@ export interface GraphDrawState {
   readonly selectedEdgeId?: string;
   readonly hoveredId?: string;
   readonly focusIds: ReadonlySet<string>;
+  readonly highlightNodeIds: ReadonlySet<string>;
+  readonly highlightEdgeIds: ReadonlySet<string>;
 }
 
 function isActive(id: string, state: GraphDrawState): boolean {
+  if (state.highlightNodeIds.size > 0) {
+    return state.highlightNodeIds.has(id);
+  }
   return state.focusIds.size === 0 || state.focusIds.has(id);
 }
 
 function shouldShowEdgeLabel(state: GraphDrawState, edge: KnowledgeGraphEdge): boolean {
-  if (state.selectedEdgeId === edge.id) {
+  if (state.selectedEdgeId === edge.id || state.highlightEdgeIds.has(edge.id)) {
     return true;
   }
   if (state.edges.length <= 24 || state.camera.scale > 0.55) {
@@ -127,9 +132,10 @@ function drawEdges(
     const { start, end, angle } = edgeEnds(from, to);
     const active = isActive(source.id, state) && isActive(target.id, state);
     const selected = edge.id === state.selectedEdgeId;
+    const highlighted = state.highlightEdgeIds.has(edge.id);
     ctx.globalAlpha = active ? 1 : 0.18;
-    ctx.strokeStyle = selected ? palette.accent : palette.border;
-    ctx.lineWidth = edgeLineWidth(selected, active);
+    ctx.strokeStyle = selected || highlighted ? palette.accent : palette.border;
+    ctx.lineWidth = edgeLineWidth(selected || highlighted, active);
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
@@ -165,6 +171,19 @@ function drawNodeLabel(
   ctx.fillText(node.label, x, ly);
 }
 
+function nodeRing(
+  palette: GraphPalette,
+  flags: { selected: boolean; hovered: boolean; highlighted: boolean },
+): { width: number; color: string } | undefined {
+  if (!flags.selected && !flags.hovered && !flags.highlighted) {
+    return undefined;
+  }
+  if (flags.highlighted && !flags.selected) {
+    return { width: 2.4, color: palette.brass };
+  }
+  return { width: 3, color: palette.ink };
+}
+
 function drawNodes(
   ctx: CanvasRenderingContext2D,
   palette: GraphPalette,
@@ -182,9 +201,11 @@ function drawNodes(
     ctx.fill();
     const selected = node.id === state.selectedId;
     const hovered = node.id === state.hoveredId;
-    if (selected || hovered) {
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = palette.ink;
+    const highlighted = state.highlightNodeIds.has(node.id);
+    const ring = nodeRing(palette, { selected, hovered, highlighted });
+    if (ring !== undefined) {
+      ctx.lineWidth = ring.width;
+      ctx.strokeStyle = ring.color;
       ctx.stroke();
     }
     const showLabel = showAllLabels || selected || hovered || state.focusIds.has(node.id);

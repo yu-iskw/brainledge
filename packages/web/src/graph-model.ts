@@ -22,6 +22,10 @@ interface KnowledgeGraph {
   readonly edges: readonly KnowledgeGraphEdge[];
 }
 
+function literalNodeId(predicateId: string, objectText: string): string {
+  return `lit_${predicateId}_${objectText}`;
+}
+
 function objectNode(fact: Fact, names: ReadonlyMap<string, string>): KnowledgeGraphNode {
   if ('entity' in fact.object) {
     const id = fact.object.entity.entityId;
@@ -33,10 +37,36 @@ function objectNode(fact: Fact, names: ReadonlyMap<string, string>): KnowledgeGr
   }
   const value = String(fact.object.value);
   return {
-    id: `lit_${fact.predicate.id}_${value}`,
+    id: literalNodeId(fact.predicate.id, value),
     label: value,
     kind: 'literal',
   };
+}
+
+export function highlightIdsFromFactHits(
+  hits: readonly {
+    readonly factId?: string;
+    readonly subjectId?: string;
+    readonly predicateId?: string;
+    readonly objectText?: string;
+  }[],
+): { nodeIds: Set<string>; edgeIds: Set<string> } {
+  const nodeIds = new Set<string>();
+  const edgeIds = new Set<string>();
+  for (const hit of hits) {
+    if (
+      hit.factId === undefined ||
+      hit.subjectId === undefined ||
+      hit.predicateId === undefined ||
+      hit.objectText === undefined
+    ) {
+      continue;
+    }
+    edgeIds.add(hit.factId);
+    nodeIds.add(hit.subjectId);
+    nodeIds.add(literalNodeId(hit.predicateId, hit.objectText));
+  }
+  return { nodeIds, edgeIds };
 }
 
 export function buildKnowledgeGraph(

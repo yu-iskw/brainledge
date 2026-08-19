@@ -412,6 +412,18 @@ textarea {
   flex: 0 0 auto;
 }
 
+ul.data-list li.extract-proposed-item {
+  cursor: default;
+}
+
+.extract-fact-text {
+  margin: 0;
+}
+
+.extract-fact-actions {
+  margin-top: 0.35rem;
+}
+
 button {
   background: var(--accent);
   border: 0;

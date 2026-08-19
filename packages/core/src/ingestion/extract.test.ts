@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseIsoUtc } from '../domain/time.js';
 import { localPrincipal } from '../identity/local.js';
 
-import { extractTypedFacts } from './extract.js';
+import { extractTypedFacts, parseLlmFactTuples } from './extract.js';
 
 const NOW = parseIsoUtc('2026-08-18T00:00:00.000Z');
 const AUTHOR = { principalId: localPrincipal().id };
@@ -64,5 +64,19 @@ describe('extractTypedFacts', () => {
       AUTHOR,
     );
     expect(facts).toHaveLength(2);
+  });
+
+  it('parses structured LLM facts and ignores unknown predicates', () => {
+    expect(
+      parseLlmFactTuples(
+        JSON.stringify({
+          facts: [
+            { subject: 'Alice', predicate: 'knows', object: 'Carol' },
+            { subject: 'Bob', predicate: 'likes', object: 'pie' },
+          ],
+        }),
+      ),
+    ).toEqual([{ subject: 'Alice', predicate: 'knows', object: 'Carol' }]);
+    expect(parseLlmFactTuples('not-json')).toEqual([]);
   });
 });

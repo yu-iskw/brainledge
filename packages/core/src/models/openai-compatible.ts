@@ -36,6 +36,18 @@ export function createOpenAiCompatibleProvider(
         body: JSON.stringify({
           model: request.model ?? config.model,
           messages: [{ role: 'user', content: request.prompt }],
+          ...(request.jsonSchema === undefined
+            ? {}
+            : {
+                response_format: {
+                  type: 'json_schema',
+                  json_schema: {
+                    name: 'brainledge_schema',
+                    schema: request.jsonSchema,
+                    strict: true,
+                  },
+                },
+              }),
         }),
         signal: AbortSignal.timeout(request.timeoutMs ?? 30_000),
       });

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const screenshotDir = 'test-results/screenshots';
 
@@ -12,13 +12,6 @@ const DANA_OR_CAFE = /Dana|cafe/iu;
 const MARKDOWN_NOTE = '# Cafe note\n\nDana prefers the window seat.';
 const TECHNICAL_ID = /ks_|ep_|ent_|ing_|principal_/iu;
 const ISO_INSTANT = /T\d{2}:\d{2}:\d{2}/u;
-
-async function extractAndAccept(page: Page): Promise<void> {
-  await page.locator('#consolidate-button').click();
-  await expect(page.locator('#extract-accept-all')).toBeVisible();
-  await page.locator('#extract-accept-all').click();
-  await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
-}
 
 test('space workbench capture, recall receipts, and inspect', async ({ page }) => {
   await page.goto('/');
@@ -97,7 +90,16 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
   await page.locator('#tab-inspect').click();
   await expect(page.locator('#panel-inspect')).toBeVisible();
   await expect(page.locator('#overview-heading')).toHaveText('Inspect');
-  await extractAndAccept(page);
+  await page.locator('#consolidate-button').click();
+  await expect(page.locator('#extract-accept-all')).toBeVisible();
+  await page
+    .locator('.extract-proposed-item')
+    .filter({ hasText: /Dana/iu })
+    .locator('.extract-skip-one')
+    .click();
+  await page.locator('#extract-accept-all').click();
+  await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+  await expect(page.locator('#graph-list')).not.toContainText(/Dana/iu);
   await expect(page.locator('#inspect-dossier')).not.toHaveText(TECHNICAL_ID);
   await expect(page.locator('#graph-list')).not.toHaveText(/livesIn|ent_/u);
   await page.screenshot({
@@ -120,6 +122,27 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
   await page.locator('#recall-receipts li').first().click();
   await expect(page.locator('#overview-heading')).toHaveText('Inspect');
   await expect(page.locator('#inspect-dossier')).toContainText(/Tokyo/iu);
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const graph = (
+          window as unknown as {
+            brainledgeGraph?: { highlights: () => { edges: string[] } };
+          }
+        ).brainledgeGraph;
+        return graph?.highlights().edges.length ?? 0;
+      }),
+    )
+    .toBeGreaterThan(0);
+  await page.screenshot({
+    path: `${screenshotDir}/06c-recall-overlay.png`,
+    fullPage: true,
+  });
+
+  await page.locator('#tab-recall').click();
+  await page.locator('#recall-memories li').first().click();
+  await expect(page.locator('#overview-heading')).toHaveText('Inspect');
+  await expect(page.locator('#inspect-dossier')).toContainText(/Alice|Tokyo/iu);
 
   await page.locator('#tab-capture').click();
   await page.locator('#remember-input').fill(ALICE_PARIS);

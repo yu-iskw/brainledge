@@ -15,7 +15,8 @@ import {
   spaceInitial,
 } from './display.js';
 import { byId, setText } from './dom.js';
-import { buildKnowledgeGraph } from './graph-model.js';
+import { bindExtractReview } from './extract-review.js';
+import { buildKnowledgeGraph, highlightIdsFromFactHits } from './graph-model.js';
 import { bindKnowledgeGraph } from './graph-view.js';
 import { formatRecallFacts } from './recall-format.js';
 import { activateMode, bindWorkbenchTabs } from './shell.js';
@@ -31,7 +32,6 @@ import type {
   IngestionResult,
   KnowledgeSpace,
   Principal,
-  ProposedFact,
   ProvenanceItem,
   RecallResult,
   Workspace,
@@ -95,6 +95,10 @@ const state: AppState = {
 let ingestionPollTimer: ReturnType<typeof setInterval> | undefined;
 let graphView: GraphViewHandle | undefined;
 let lastRecallQuery: string | undefined;
+let lastRecallHighlights: { nodeIds: Set<string>; edgeIds: Set<string> } = {
+  nodeIds: new Set(),
+  edgeIds: new Set(),
+};
 
 function cssColor(name: string, fallback: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -150,6 +154,11 @@ function ensureGraphView(): GraphViewHandle {
   return graphView;
 }
 
+function clearRecallOverlay(): void {
+  lastRecallHighlights = { nodeIds: new Set(), edgeIds: new Set() };
+  graphView?.clearHighlights();
+}
+
 function paintKnowledgeMap(): void {
   const graph = buildKnowledgeGraph(state.facts, state.entities);
   const empty = byId<HTMLElement>('graph-empty');
@@ -167,8 +176,20 @@ function paintKnowledgeMap(): void {
   }
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      ensureGraphView().setGraph(graph.nodes, graph.edges);
+      const view = ensureGraphView();
+      view.setGraph(graph.nodes, graph.edges);
+      view.setHighlights(lastRecallHighlights.nodeIds, lastRecallHighlights.edgeIds);
     });
+  });
+}
+
+function inspectEpisode(episodeId: string | undefined): void {
+  state.selectedEpisodeId = episodeId;
+  activateMode('inspect');
+  renderDossier();
+  renderEpisodeList(TIMELINE_LIST_ID, state.timeline, EMPTY_TIMELINE_TITLE, EMPTY_TIMELINE);
+  requestAnimationFrame(() => {
+    paintKnowledgeMap();
   });
 }
 
@@ -497,12 +518,7 @@ function renderGraph(): void {
     meta.textContent = `${world.length > 0 ? `World: ${world} · ` : ''}${fact.status ?? 'active'}`;
     item.append(triple, meta);
     item.addEventListener('click', () => {
-      if (fact.sourceEpisodeId !== undefined) {
-        state.selectedEpisodeId = fact.sourceEpisodeId;
-        activateMode('inspect');
-        renderDossier();
-        renderEpisodeList(TIMELINE_LIST_ID, state.timeline, EMPTY_TIMELINE_TITLE, EMPTY_TIMELINE);
-      }
+      inspectEpisode(fact.sourceEpisodeId);
     });
     list.append(item);
   }
@@ -524,10 +540,7 @@ function renderRecallReceipts(result: RecallResult): void {
     const item = document.createElement('li');
     item.textContent = formatRecallFacts([hit]);
     item.addEventListener('click', () => {
-      state.selectedEpisodeId = hit.sourceEpisodeId;
-      activateMode('inspect');
-      renderDossier();
-      renderEpisodeList(TIMELINE_LIST_ID, state.timeline, EMPTY_TIMELINE_TITLE, EMPTY_TIMELINE);
+      inspectEpisode(hit.sourceEpisodeId);
     });
     list.append(item);
   }
@@ -550,9 +563,7 @@ function renderProvenance(items: readonly ProvenanceItem[]): void {
     );
     item.textContent = formatProvenanceLabel(source?.content);
     item.addEventListener('click', () => {
-      state.selectedEpisodeId = entry.episodeId;
-      activateMode('inspect');
-      renderDossier();
+      inspectEpisode(entry.episodeId);
     });
     list.append(item);
   }
@@ -753,6 +764,10 @@ async function recall(): Promise<void> {
     return;
   }
   lastRecallQuery = input.value;
+  lastRecallHighlights =
+    result.facts.length > 0
+      ? highlightIdsFromFactHits(result.facts)
+      : { nodeIds: new Set(), edgeIds: new Set() };
   const memories = result.memories.map((hit) => hit.content).join('\n---\n');
   if (result.facts.length > 0) {
     output.textContent = formatRecallFacts(result.facts);
@@ -782,6 +797,9 @@ function renderRecallMemories(result: RecallResult): void {
     const content = document.createElement('p');
     content.textContent = hit.content;
     item.append(content);
+    item.addEventListener('click', () => {
+      inspectEpisode(hit.episodeId);
+    });
     list.append(item);
   }
 }
@@ -870,79 +888,6 @@ async function createSpace(event: SubmitEvent): Promise<void> {
   await selectSpace(result.id);
 }
 
-interface ConsolidateResponse {
-  readonly factCount: number;
-  readonly proposed?: readonly ProposedFact[];
-  readonly status?: string;
-}
-
-function renderProposedFacts(proposed: readonly ProposedFact[]): void {
-  const list = byId<HTMLUListElement>('extract-proposed');
-  const accept = byId<HTMLButtonElement>('extract-accept-all');
-  const skip = byId<HTMLButtonElement>('extract-skip');
-  list.replaceChildren();
-  const hasProposed = proposed.length > 0;
-  accept.hidden = !hasProposed;
-  skip.hidden = !hasProposed;
-  if (!hasProposed) {
-    const item = document.createElement('li');
-    item.className = 'meta';
-    item.textContent = NO_NEW_FACTS;
-    list.append(item);
-    return;
-  }
-  for (const fact of proposed) {
-    const item = document.createElement('li');
-    const sentence = formatFactSentence({
-      subjectId: fact.subjectId,
-      predicateId: fact.predicateId,
-      objectText: fact.objectText,
-      summary: `${fact.subjectId} ${fact.predicateId} ${fact.objectText}`,
-    });
-    item.textContent = fact.closes === undefined ? sentence : `${sentence} · closes ${fact.closes}`;
-    list.append(item);
-  }
-}
-
-async function previewExtract(): Promise<void> {
-  setStatus(INSPECT_STATUS_ID, 'Extracting facts…');
-  const result = await safeCall(
-    () => apiPost<ConsolidateResponse>(`${spacePath('/consolidate')}?dryRun=1`, {}),
-    { onError: (message) => setStatus(INSPECT_STATUS_ID, message) },
-  );
-  if (!result) {
-    return;
-  }
-  const proposed = result.proposed ?? [];
-  renderProposedFacts(proposed);
-  if (proposed.length === 0) {
-    setStatus(INSPECT_STATUS_ID, NO_NEW_FACTS);
-    return;
-  }
-  setStatus(INSPECT_STATUS_ID, `Review ${String(proposed.length)} proposed facts`);
-}
-
-async function acceptExtract(): Promise<void> {
-  setStatus(INSPECT_STATUS_ID, 'Accepting facts…');
-  const result = await safeCall(() => apiPost<ConsolidateResponse>(spacePath('/consolidate'), {}), {
-    onError: (message) => setStatus(INSPECT_STATUS_ID, message),
-  });
-  if (!result) {
-    return;
-  }
-  renderProposedFacts([]);
-  setStatus(
-    INSPECT_STATUS_ID,
-    result.factCount === 0 ? NO_NEW_FACTS : `Extracted ${String(result.factCount)} facts`,
-  );
-  await loadSpaceProjections();
-}
-
-function skipExtract(): void {
-  renderProposedFacts([]);
-  setStatus(INSPECT_STATUS_ID, 'Skipped extraction');
-}
-
 function forgetProgressLabel(mode: 'hide' | 'retract' | 'purge'): string {
   switch (mode) {
     case 'hide': {
@@ -1005,6 +950,14 @@ async function forgetSelected(mode: 'hide' | 'retract' | 'purge'): Promise<void>
 }
 
 function bindEvents(): void {
+  const extractReview = bindExtractReview({
+    inspectStatusId: INSPECT_STATUS_ID,
+    noNewFacts: NO_NEW_FACTS,
+    spacePath,
+    setStatus,
+    loadSpaceProjections,
+    safeCall,
+  });
   bindWorkbenchTabs((mode) => {
     if (mode === 'inspect') {
       requestAnimationFrame(() => {
@@ -1019,6 +972,7 @@ function bindEvents(): void {
     ensureGraphView().zoomBy(0.84);
   });
   byId<HTMLButtonElement>('graph-fit').addEventListener('click', () => {
+    clearRecallOverlay();
     ensureGraphView().fit();
   });
   byId<HTMLInputElement>('graph-search').addEventListener('input', () => {
@@ -1065,13 +1019,14 @@ function bindEvents(): void {
     }
   });
   byId<HTMLButtonElement>('consolidate-button').addEventListener('click', () => {
-    void previewExtract();
+    clearRecallOverlay();
+    void extractReview.previewExtract();
   });
   byId<HTMLButtonElement>('extract-accept-all').addEventListener('click', () => {
-    void acceptExtract();
+    void extractReview.acceptExtract();
   });
   byId<HTMLButtonElement>('extract-skip').addEventListener('click', () => {
-    skipExtract();
+    extractReview.skipExtract();
   });
   byId<HTMLButtonElement>('forget-button').addEventListener('click', () => {
     void forgetSelected('hide');

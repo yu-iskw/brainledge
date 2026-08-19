@@ -11,8 +11,10 @@ describe('server helpers', () => {
     expect(defaultListenHost()).toMatch(/127|localhost/u);
     expect(defaultListenPort()).toBeGreaterThan(0);
     expect(parseMcpProfiles(undefined)).toContain('memory-read');
+    expect(parseMcpProfiles(undefined)).toContain('knowledge-admin');
     expect(() => parseMcpProfiles('knowledge-read')).toThrow(/implemented tools/u);
     expect(() => parseMcpProfiles('knowledge-read,not-a-profile')).toThrow(/implemented tools/u);
+    expect(parseMcpProfiles('knowledge-admin')).toEqual(['knowledge-admin']);
     expect(parseMcpProfiles('memory-read,knowledge-read')).toEqual([
       'memory-read',
       'knowledge-read',

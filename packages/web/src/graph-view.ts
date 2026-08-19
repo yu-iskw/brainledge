@@ -21,6 +21,9 @@ export interface GraphViewHandle {
   setCamera: (camera: GraphCamera) => void;
   selectNode: (id: string | undefined) => void;
   focusNode: (id: string | undefined) => void;
+  setHighlights: (nodes: ReadonlySet<string>, edges: ReadonlySet<string>) => void;
+  clearHighlights: () => void;
+  highlights: () => { nodes: readonly string[]; edges: readonly string[] };
   nodeIds: () => readonly string[];
   positions: () => readonly { id: string; x: number; y: number }[];
   camera: () => GraphCamera;
@@ -29,6 +32,32 @@ export interface GraphViewHandle {
   screenPositions: () => readonly { id: string; label: string; x: number; y: number }[];
   redraw: () => void;
   destroy: () => void;
+}
+
+function focusIdsForSelection(
+  selectedId: string | undefined,
+  selectedEdgeId: string | undefined,
+  edges: readonly KnowledgeGraphEdge[],
+): ReadonlySet<string> {
+  if (selectedEdgeId !== undefined) {
+    const edge = edges.find((item) => item.id === selectedEdgeId);
+    if (edge !== undefined) {
+      return new Set([edge.sourceId, edge.targetId]);
+    }
+  }
+  return neighborIds(selectedId, edges);
+}
+
+function incidentEdgeFor(
+  nodeId: string | undefined,
+  edges: readonly KnowledgeGraphEdge[],
+): KnowledgeGraphEdge | undefined {
+  if (nodeId === undefined) {
+    return undefined;
+  }
+  return (
+    edges.find((item) => item.sourceId === nodeId) ?? edges.find((item) => item.targetId === nodeId)
+  );
 }
 
 export function bindKnowledgeGraph(
@@ -46,6 +75,8 @@ export function bindKnowledgeGraph(
   let selectedId: string | undefined;
   let selectedEdgeId: string | undefined;
   let hoveredId: string | undefined;
+  let highlightNodeIds: ReadonlySet<string> = new Set();
+  let highlightEdgeIds: ReadonlySet<string> = new Set();
   let dragging = false;
   let moved = 0;
   let lastX = 0;
@@ -75,24 +106,6 @@ export function bindKnowledgeGraph(
     return { width, height };
   };
 
-  const focusIds = (): ReadonlySet<string> => {
-    if (selectedEdgeId !== undefined) {
-      const edge = edges.find((item) => item.id === selectedEdgeId);
-      if (edge !== undefined) {
-        return new Set([edge.sourceId, edge.targetId]);
-      }
-    }
-    return neighborIds(selectedId, edges);
-  };
-
-  const incidentEdge = (nodeId: string | undefined): KnowledgeGraphEdge | undefined => {
-    if (nodeId === undefined) {
-      return undefined;
-    }
-    const outgoing = edges.find((item) => item.sourceId === nodeId);
-    return outgoing ?? edges.find((item) => item.targetId === nodeId);
-  };
-
   const redraw = (): void => {
     const { width, height } = size();
     drawKnowledgeGraph(ctx, width, height, palette, {
@@ -102,7 +115,9 @@ export function bindKnowledgeGraph(
       selectedId,
       selectedEdgeId,
       hoveredId,
-      focusIds: focusIds(),
+      focusIds: focusIdsForSelection(selectedId, selectedEdgeId, edges),
+      highlightNodeIds,
+      highlightEdgeIds,
     });
   };
 
@@ -241,8 +256,21 @@ export function bindKnowledgeGraph(
       const { width, height } = size();
       const screen = worldToScreen(camera, node.x, node.y);
       camera = panCamera(camera, width / 2 - screen.x, height / 2 - screen.y);
-      onSelect(node, incidentEdge(id));
+      onSelect(node, incidentEdgeFor(id, edges));
       redraw();
+    },
+    setHighlights(nodesToHighlight, edgesToHighlight) {
+      highlightNodeIds = nodesToHighlight;
+      highlightEdgeIds = edgesToHighlight;
+      redraw();
+    },
+    clearHighlights() {
+      highlightNodeIds = new Set();
+      highlightEdgeIds = new Set();
+      redraw();
+    },
+    highlights() {
+      return { nodes: [...highlightNodeIds], edges: [...highlightEdgeIds] };
     },
     nodeIds() {
       return nodes.map((node) => node.id);

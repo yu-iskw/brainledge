@@ -77,6 +77,7 @@ export interface ProposedFact {
   readonly predicateId: string;
   readonly objectText: string;
   readonly sourceEpisodeId: string;
+  readonly validFrom?: string;
   readonly closes?: string;
 }
 

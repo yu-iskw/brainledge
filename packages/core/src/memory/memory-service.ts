@@ -27,7 +27,7 @@ export interface MemoryService {
   forget(context: ExecutionContext, input: ForgetInput): Promise<void>;
   consolidate(
     context: ExecutionContext,
-    input: { spaceId: string; dryRun?: boolean },
+    input: { spaceId: string; dryRun?: boolean; accept?: readonly ProposedFact[] },
   ): Promise<{ factCount: number; proposed?: readonly ProposedFact[] }>;
 }
 

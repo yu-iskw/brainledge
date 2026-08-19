@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildKnowledgeGraph } from './graph-model.js';
+import { buildKnowledgeGraph, highlightIdsFromFactHits } from './graph-model.js';
 
 import type { Fact } from './types.js';
 
@@ -39,5 +39,19 @@ describe('buildKnowledgeGraph', () => {
     );
     expect(graph.nodes).toHaveLength(3);
     expect(graph.edges).toHaveLength(2);
+  });
+
+  it('maps recall fact hits onto node and edge highlight ids', () => {
+    const highlights = highlightIdsFromFactHits([
+      {
+        factId: 'fact_1',
+        subjectId: 'ent_alice',
+        predicateId: 'livesIn',
+        objectText: 'Tokyo',
+      },
+    ]);
+    expect([...highlights.edgeIds]).toEqual(['fact_1']);
+    expect(highlights.nodeIds.has('ent_alice')).toBe(true);
+    expect(highlights.nodeIds.has('lit_livesIn_Tokyo')).toBe(true);
   });
 });

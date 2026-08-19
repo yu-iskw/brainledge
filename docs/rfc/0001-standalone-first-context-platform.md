@@ -78,6 +78,7 @@ The original RFC’s **direction is right**. Its **delivery shape would recreate
 17. **CLI binary was `app`.** Binary name is `brainledge`.
 18. **P2 was demand-gated.** All twenty P2 items are implemented as optional adapters in Phase 7.
 19. **Walking-skeleton extract is live.** Phase 1 recall is lexical over episodes PLUS post-consolidate fact hits. Curator-loop UI (extract review, map-first Inspect, fact-first Recall) is Phase 4 productization, not a new domain model. RFC Phase 1 "facts empty until Phase 4" is superseded by the walking-skeleton extract; extraction is still not `remember()`.
+20. **MCP parity and optional LLM extract.** Laptop MCP exposes `memory.remember`, `memory.recall` (fact-first receipts), `memory.forget`, and `knowledge.consolidate` (including `dryRun`). Optional OpenAI-compatible generation is wired only into extract; regex remains the default. Hybrid/vector recall, decisions UI, export, contradiction UI, and ontology studio stay deferred until that loop is loved.
 
 **Unchanged:** one semantic model, SQL baseline, append-only history, authn ≠ authz, memory as facade, no mandatory graph DB, loopback fail-closed, MCP and REST share use cases, `core` imports no frameworks.
 

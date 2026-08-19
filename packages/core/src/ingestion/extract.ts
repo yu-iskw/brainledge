@@ -4,6 +4,30 @@ import { parseIsoUtc } from '../domain/time.js';
 import type { IsoUtcTimestamp } from '../domain/time.js';
 import type { PrincipalRef } from '../identity/principal.js';
 import type { Fact } from '../knowledge/fact.js';
+import type { GenerationResponse, TextGenerationProvider } from '../models/providers.js';
+
+const ALLOWED_LLM_PREDICATES = new Set(['livesIn', 'knows', 'worksAt', 'taught', 'taughtIn']);
+
+const EXTRACT_FACT_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    facts: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          subject: { type: 'string' },
+          predicate: { type: 'string' },
+          object: { type: 'string' },
+        },
+        required: ['subject', 'predicate', 'object'],
+      },
+    },
+  },
+  required: ['facts'],
+};
 
 const MONTHS: Readonly<Record<string, string>> = {
   january: '01',
@@ -48,7 +72,7 @@ function worldMonthStart(
   return parseIsoUtc(`${year}-${mm}-01T00:00:00.000Z`);
 }
 
-function fact(input: {
+export function createExtractedFact(input: {
   subjectName: string;
   predicate: string;
   objectValue: string;
@@ -88,7 +112,7 @@ export function extractTypedFacts(
     validFrom?: IsoUtcTimestamp,
   ): void => {
     facts.push(
-      fact({
+      createExtractedFact({
         subjectName,
         predicate,
         objectValue,
@@ -111,4 +135,84 @@ export function extractTypedFacts(
     emit(match[1], 'taughtIn', match[3]);
   }
   return facts;
+}
+
+interface LlmFactTuple {
+  readonly subject: string;
+  readonly predicate: string;
+  readonly object: string;
+}
+
+function asTrimmedString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function llmFactRows(parsed: unknown): unknown[] {
+  if (parsed === null || typeof parsed !== 'object' || !('facts' in parsed)) {
+    return [];
+  }
+  const facts = parsed.facts;
+  return Array.isArray(facts) ? facts : [];
+}
+
+function asLlmFactTuple(row: unknown): LlmFactTuple | undefined {
+  if (row === null || typeof row !== 'object') {
+    return undefined;
+  }
+  const record = row as Record<string, unknown>;
+  const subject = asTrimmedString(record.subject);
+  const predicate = asTrimmedString(record.predicate);
+  const object = asTrimmedString(record.object);
+  if (subject.length === 0 || object.length === 0 || !ALLOWED_LLM_PREDICATES.has(predicate)) {
+    return undefined;
+  }
+  return { subject, predicate, object };
+}
+
+export function parseLlmFactTuples(text: string): LlmFactTuple[] {
+  if (text.trim().length === 0) {
+    return [];
+  }
+  try {
+    const tuples: LlmFactTuple[] = [];
+    for (const row of llmFactRows(JSON.parse(text))) {
+      const tuple = asLlmFactTuple(row);
+      if (tuple !== undefined) {
+        tuples.push(tuple);
+      }
+    }
+    return tuples;
+  } catch {
+    return [];
+  }
+}
+
+export async function extractFactsWithLlm(input: {
+  readonly content: string;
+  readonly workspaceId: string;
+  readonly spaceId: string;
+  readonly now: IsoUtcTimestamp;
+  readonly createdBy: PrincipalRef;
+  readonly provider: TextGenerationProvider;
+}): Promise<Fact[]> {
+  let generated: GenerationResponse;
+  try {
+    generated = await input.provider.generate({
+      prompt: `Extract typed facts from this note. Allowed predicates: livesIn, knows, worksAt, taught, taughtIn. Return JSON {"facts":[{"subject":"...","predicate":"...","object":"..."}]}.\n\n${input.content}`,
+      jsonSchema: EXTRACT_FACT_SCHEMA,
+    });
+  } catch {
+    return [];
+  }
+  return parseLlmFactTuples(generated.text).map((tuple) =>
+    createExtractedFact({
+      subjectName: tuple.subject,
+      predicate: tuple.predicate,
+      objectValue: tuple.object,
+      workspaceId: input.workspaceId,
+      spaceId: input.spaceId,
+      now: input.now,
+      createdBy: input.createdBy,
+    }),
+  );
 }

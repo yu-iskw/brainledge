@@ -21,6 +21,7 @@ import {
   rememberBody,
   spaceCreateBody,
   spaceUpdateBody,
+  consolidateBody,
 } from './schemas.js';
 
 import type { Hono } from 'hono';
@@ -188,7 +189,35 @@ function registerMemoryRoutes(app: Hono, application: Application): void {
     const id = requestId(context.req.header(REQUEST_ID_HEADER));
     const spaceId = context.req.param('spaceId');
     const dryRun = context.req.query('dryRun') === '1';
-    const result = await application.memory.consolidate(localContext(), { spaceId, dryRun });
+    const raw = await context.req.text();
+    let accept:
+      | {
+          readonly subjectId: string;
+          readonly predicateId: string;
+          readonly objectText: string;
+          readonly sourceEpisodeId: string;
+          readonly validFrom?: string;
+          readonly closes?: string;
+        }[]
+      | undefined;
+    if (raw.trim() !== '') {
+      let parsedBody: unknown;
+      try {
+        parsedBody = JSON.parse(raw) as unknown;
+      } catch {
+        return context.json(errorBody('INVALID_BODY', 'JSON body required', id), 400);
+      }
+      const parsed = consolidateBody.safeParse(parsedBody);
+      if (!parsed.success) {
+        return context.json(errorBody('INVALID_BODY', 'accept must be proposed facts', id), 400);
+      }
+      accept = parsed.data.accept;
+    }
+    const result = await application.memory.consolidate(localContext(), {
+      spaceId,
+      dryRun,
+      accept,
+    });
     return context.json({
       status: dryRun ? 'preview' : 'completed',
       factCount: result.factCount,

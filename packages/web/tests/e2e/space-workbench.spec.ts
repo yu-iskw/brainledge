@@ -37,7 +37,7 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
   await page.locator('#remember-button').click();
   await expect(page.locator('#remember-status')).toHaveText(/^Saved$/u);
   await expect(page.locator('#extract-on-map')).toBeVisible();
-  await expect(page.locator('#extract-on-map')).toHaveText(/^Extract on map$/u);
+  await expect(page.locator('#extract-on-map')).toHaveText('Extract on map');
   await expect(page.locator('#memory-list')).toContainText(DANA_OR_CAFE);
   await expect(page.locator('#memory-list')).not.toHaveText(ISO_INSTANT);
   await expect(page.locator('#memory-list')).not.toHaveText(TECHNICAL_ID);

@@ -18,6 +18,7 @@ import { byId, setText } from './dom.js';
 import { bindExtractReview } from './extract-review.js';
 import { buildKnowledgeGraph, highlightIdsFromFactHits } from './graph-model.js';
 import { bindKnowledgeGraph } from './graph-view.js';
+import { activateInspectRail, bindInspectRailTabs } from './inspect-rail.js';
 import { formatRecallFacts } from './recall-format.js';
 import { activateMode, bindWorkbenchTabs } from './shell.js';
 
@@ -57,6 +58,10 @@ const TIMELINE_LIST_ID = 'timeline-list';
 const RECALL_INPUT_ID = 'recall-input';
 const SPACES_CREATE_FORM_ID = 'spaces-create-form';
 const NEW_SPACE_TOGGLE_ID = 'new-space-toggle';
+const INGEST_FORM_ID = 'ingest-form';
+const INGEST_TOGGLE_ID = 'ingest-toggle';
+const EXTRACT_ON_MAP_ID = 'extract-on-map';
+const GRAPH_EMPTY_EXTRACT_ID = 'graph-empty-extract';
 
 const INGESTION_TERMINAL_STATUSES = new Set([
   'succeeded',
@@ -107,13 +112,13 @@ function cssColor(name: string, fallback: string): string {
 
 function graphPalette(): GraphPalette {
   return {
-    ink: cssColor('--ink', '#15202b'),
-    muted: cssColor('--muted', '#667788'),
-    surface: cssColor('--surface', '#ffffff'),
-    accent: cssColor('--accent', '#3d7ea6'),
-    brass: cssColor('--brass', '#c4a35a'),
-    paper: cssColor('--paper', '#eef1f5'),
-    border: cssColor('--border', '#d5dde4'),
+    ink: cssColor('--ink', '#1a1814'),
+    muted: cssColor('--muted', '#6f6a62'),
+    surface: cssColor('--surface', '#fffcf7'),
+    accent: cssColor('--accent', '#3f6f64'),
+    brass: cssColor('--brass', '#b08d57'),
+    paper: cssColor('--paper', '#f3efe6'),
+    border: cssColor('--border', '#d8d1c4'),
   };
 }
 
@@ -159,12 +164,40 @@ function clearRecallOverlay(): void {
   graphView?.clearHighlights();
 }
 
+function latestEpisodeId(): string | undefined {
+  if (state.selectedEpisodeId !== undefined) {
+    return state.selectedEpisodeId;
+  }
+  if (state.timeline.length > 0) {
+    return state.timeline[0].id;
+  }
+  if (state.episodes.length > 0) {
+    return state.episodes[0].id;
+  }
+  return undefined;
+}
+
+function showDossierRail(): void {
+  activateInspectRail('dossier');
+}
+
+function setDisclosureOpen(toggleId: string, panelId: string, open: boolean): void {
+  byId<HTMLElement>(panelId).hidden = !open;
+  byId<HTMLButtonElement>(toggleId).setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function setExtractOnMapVisible(visible: boolean): void {
+  byId<HTMLButtonElement>(EXTRACT_ON_MAP_ID).hidden = !visible;
+}
+
 function paintKnowledgeMap(): void {
   const graph = buildKnowledgeGraph(state.facts, state.entities);
   const empty = byId<HTMLElement>('graph-empty');
   const canvas = byId<HTMLCanvasElement>('knowledge-graph');
   empty.hidden = graph.nodes.length > 0;
   canvas.hidden = graph.nodes.length === 0;
+  const emptyExtract = byId<HTMLButtonElement>(GRAPH_EMPTY_EXTRACT_ID);
+  emptyExtract.disabled = latestEpisodeId() === undefined;
   setText(
     'graph-caption',
     graph.nodes.length === 0 ? '' : graphCountLabel(graph.nodes.length, graph.edges.length),
@@ -186,6 +219,7 @@ function paintKnowledgeMap(): void {
 function inspectEpisode(episodeId: string | undefined): void {
   state.selectedEpisodeId = episodeId;
   activateMode('inspect');
+  showDossierRail();
   renderDossier();
   renderEpisodeList(TIMELINE_LIST_ID, state.timeline, EMPTY_TIMELINE_TITLE, EMPTY_TIMELINE);
   requestAnimationFrame(() => {
@@ -712,6 +746,7 @@ async function selectSpace(spaceId: string): Promise<void> {
   clearGlobalError();
   state.selectedSpaceId = spaceId;
   state.selectedEpisodeId = undefined;
+  setExtractOnMapVisible(false);
   setStatus(SPACES_STATUS_ID, '');
   await loadSpaceProjections();
 }
@@ -741,6 +776,7 @@ async function remember(): Promise<void> {
   setStatus(REMEMBER_STATUS_ID, formatSavedStatus());
   input.value = '';
   state.selectedEpisodeId = result.episodeId;
+  setExtractOnMapVisible(true);
   await loadSpaceProjections();
 }
 
@@ -881,8 +917,7 @@ async function createSpace(event: SubmitEvent): Promise<void> {
     return;
   }
   nameInput.value = '';
-  byId<HTMLFormElement>(SPACES_CREATE_FORM_ID).hidden = true;
-  byId<HTMLButtonElement>(NEW_SPACE_TOGGLE_ID).setAttribute('aria-expanded', 'false');
+  setDisclosureOpen(NEW_SPACE_TOGGLE_ID, SPACES_CREATE_FORM_ID, false);
   setStatus(SPACES_STATUS_ID, `Created ${result.name}`);
   await loadSpaces();
   await selectSpace(result.id);
@@ -956,15 +991,20 @@ function bindEvents(): void {
     spacePath,
     setStatus,
     loadSpaceProjections,
+    onFactsCommitted: () => {
+      activateInspectRail('facts');
+    },
     safeCall,
   });
   bindWorkbenchTabs((mode) => {
     if (mode === 'inspect') {
+      showDossierRail();
       requestAnimationFrame(() => {
         paintKnowledgeMap();
       });
     }
   });
+  bindInspectRailTabs();
   byId<HTMLButtonElement>('graph-zoom-in').addEventListener('click', () => {
     ensureGraphView().zoomBy(1.18);
   });
@@ -1007,11 +1047,26 @@ function bindEvents(): void {
     }
   });
   byId<HTMLButtonElement>(NEW_SPACE_TOGGLE_ID).addEventListener('click', () => {
-    const form = byId<HTMLFormElement>(SPACES_CREATE_FORM_ID);
-    const toggle = byId<HTMLButtonElement>(NEW_SPACE_TOGGLE_ID);
-    const open = form.hidden;
-    form.hidden = !open;
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const open = byId<HTMLFormElement>(SPACES_CREATE_FORM_ID).hidden;
+    setDisclosureOpen(NEW_SPACE_TOGGLE_ID, SPACES_CREATE_FORM_ID, open);
+  });
+  byId<HTMLButtonElement>(INGEST_TOGGLE_ID).addEventListener('click', () => {
+    const open = byId<HTMLElement>(INGEST_FORM_ID).hidden;
+    setDisclosureOpen(INGEST_TOGGLE_ID, INGEST_FORM_ID, open);
+  });
+  byId<HTMLButtonElement>(EXTRACT_ON_MAP_ID).addEventListener('click', () => {
+    inspectEpisode(state.selectedEpisodeId ?? latestEpisodeId());
+    showDossierRail();
+  });
+  byId<HTMLButtonElement>(GRAPH_EMPTY_EXTRACT_ID).addEventListener('click', () => {
+    const episodeId = latestEpisodeId();
+    if (episodeId === undefined) {
+      setStatus(INSPECT_STATUS_ID, 'Capture a note first.');
+      return;
+    }
+    inspectEpisode(episodeId);
+    activateInspectRail('extract');
+    void extractReview.previewExtract();
   });
   byId<HTMLInputElement>(RECALL_INPUT_ID).addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
@@ -1020,6 +1075,7 @@ function bindEvents(): void {
   });
   byId<HTMLButtonElement>('consolidate-button').addEventListener('click', () => {
     clearRecallOverlay();
+    activateInspectRail('extract');
     void extractReview.previewExtract();
   });
   byId<HTMLButtonElement>('extract-accept-all').addEventListener('click', () => {

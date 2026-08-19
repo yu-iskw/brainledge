@@ -1,31 +1,34 @@
 :root {
   color-scheme: light dark;
 
-  --ink: #15202b;
-  --paper: #eef1f5;
-  --shelf: #15202b;
-  --shelf-ink: #e8eef3;
-  --shelf-muted: #8aa0b3;
-  --accent: #3d7ea6;
-  --brass: #c4a35a;
-  --surface: #fff;
+  --ink: #1a1814;
+  --paper: #f3efe6;
+  --shelf: #2a2620;
+  --shelf-ink: #f3efe6;
+  --shelf-muted: #b3a48c;
+  --accent: #3f6f64;
+  --brass: #b08d57;
+  --surface: #fffcf7;
   --border: color-mix(in srgb, var(--ink) 14%, transparent);
   --muted: color-mix(in srgb, var(--ink) 58%, transparent);
   --danger: #8b2e2e;
   --ok: #2f6f4e;
   --focus: 2px solid var(--accent);
   --font: 'Avenir Next', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', palatino, 'Book Antiqua', georgia, serif;
   --mono: ui-monospace, 'SF Mono', menlo, consolas, monospace;
+  --radius: 0.35rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink: #e8eef3;
-    --paper: #10161c;
-    --shelf: #0b1014;
-    --shelf-ink: #e8eef3;
-    --shelf-muted: #7d93a6;
-    --surface: #18222c;
+    --ink: #f3efe6;
+    --paper: #161410;
+    --shelf: #1c1814;
+    --shelf-ink: #f3efe6;
+    --shelf-muted: #a89880;
+    --accent: #6a9a8e;
+    --surface: #241f1a;
     --border: color-mix(in srgb, var(--ink) 18%, transparent);
     --muted: color-mix(in srgb, var(--ink) 62%, transparent);
   }
@@ -65,9 +68,11 @@ body {
 }
 
 .wordmark {
-  letter-spacing: 0.18em;
+  font-stretch: condensed;
+  font-weight: 650;
+  letter-spacing: 0.04em;
   margin: 0;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .wordmark small {
@@ -76,7 +81,7 @@ body {
   display: block;
   font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   margin-top: 0.4rem;
   padding-top: 0.4rem;
   text-transform: none;
@@ -105,7 +110,7 @@ body {
 .shelf input[type='text'] {
   background: color-mix(in srgb, var(--shelf-ink) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--shelf-ink) 18%, transparent);
-  border-radius: 0.25rem;
+  border-radius: var(--radius);
   color: var(--shelf-ink);
   padding: 0.4rem 0.5rem;
   width: 100%;
@@ -145,8 +150,9 @@ body {
 }
 
 .chrome h1 {
-  font-size: 1.05rem;
+  font-size: 1.35rem;
   font-weight: 650;
+  letter-spacing: 0.01em;
   margin: 0;
 }
 
@@ -159,7 +165,7 @@ body {
 .space-badge {
   align-items: center;
   background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-  border-radius: 0.45rem;
+  border-radius: var(--radius);
   color: var(--accent);
   display: inline-flex;
   font-size: 0.95rem;
@@ -222,6 +228,10 @@ body {
   max-width: 42ch;
 }
 
+.empty-state button {
+  margin-top: 0.85rem;
+}
+
 ul.data-list li.meta,
 ul.data-list .meta {
   align-items: center;
@@ -245,8 +255,44 @@ ul.data-list .pill {
 .inspect-rail {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
   min-width: 0;
+}
+
+.rail-tabs {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.rail-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-bottom: -1px;
+  padding: 0.55rem 0.65rem;
+}
+
+.rail-tabs button[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.work input,
+.work textarea,
+.work select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font: inherit;
+  padding: 0.45rem 0.55rem;
 }
 
 .graph-stage {
@@ -267,7 +313,7 @@ ul.data-list .pill {
 .graph-frame {
   background: color-mix(in srgb, var(--paper) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: var(--radius);
   flex: 1 1 auto;
   height: auto;
   min-height: 36rem;
@@ -359,9 +405,41 @@ textarea:focus-visible {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.6rem;
+  border-radius: var(--radius);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent);
   padding: 1.1rem 1.15rem;
+}
+
+.composer {
+  border-left: 3px solid var(--brass);
+}
+
+.composer textarea {
+  font-family: var(--serif);
+  font-size: 1.08rem;
+  line-height: 1.5;
+  min-height: 12rem;
+}
+
+.ingest-toggle {
+  color: var(--ink);
+  font-weight: 650;
+  width: 100%;
+}
+
+.work .disclosure {
+  color: var(--ink);
+}
+
+.ingest-card {
+  padding-top: 0.85rem;
+}
+
+.dossier-content,
+.recall-answer,
+ul.data-list li > p,
+.extract-fact-text {
+  font-family: var(--serif);
 }
 
 .dossier-content {
@@ -427,7 +505,7 @@ ul.data-list li.extract-proposed-item {
 button {
   background: var(--accent);
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: var(--radius);
   color: #fff;
   cursor: pointer;
   font: inherit;
@@ -457,7 +535,7 @@ button:disabled {
 
 .status,
 .error-banner {
-  border-radius: 0.25rem;
+  border-radius: var(--radius);
   margin: 0.5rem 0 0;
   padding: 0.45rem 0.65rem;
 }
@@ -516,8 +594,8 @@ ul.data-list li p {
 
 .receipt,
 .dossier {
-  font-family: var(--mono);
-  font-size: 0.85rem;
+  font-family: var(--serif);
+  font-size: 1rem;
   white-space: pre-wrap;
 }
 
@@ -557,6 +635,10 @@ ul.data-list li p {
   .graph-stage {
     min-height: 32rem;
   }
+
+  .composer textarea {
+    min-height: 8rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -566,6 +648,8 @@ ul.data-list li p {
 }
 
 .recall-answer {
+  font-family: var(--serif);
+  font-size: 1.15rem;
   font-weight: 600;
   line-height: 1.45;
   margin: 0.85rem 0 0;

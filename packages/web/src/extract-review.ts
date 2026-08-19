@@ -22,6 +22,7 @@ interface ExtractReviewDeps {
   spacePath: (path: string) => string;
   setStatus: (id: string, text: string) => void;
   loadSpaceProjections: () => Promise<void>;
+  onFactsCommitted?: () => void;
   safeCall: <T>(
     action: () => Promise<T>,
     options?: { onError?: (message: string) => void },
@@ -128,6 +129,7 @@ export function bindExtractReview(deps: ExtractReviewDeps): {
         deps.inspectStatusId,
         factCount === 0 ? deps.noNewFacts : `Extracted ${String(factCount)} facts`,
       );
+      deps.onFactsCommitted?.();
     } finally {
       setExtractBusy(false);
     }
@@ -154,6 +156,9 @@ export function bindExtractReview(deps: ExtractReviewDeps): {
           ? `Extracted ${String(factCount)} facts`
           : `Accepted · ${String(remaining.length)} remaining`,
       );
+      if (remaining.length === 0) {
+        deps.onFactsCommitted?.();
+      }
     } finally {
       setExtractBusy(false);
     }

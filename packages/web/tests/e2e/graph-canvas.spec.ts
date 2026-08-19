@@ -37,6 +37,7 @@ async function extractAndAccept(page: Page): Promise<void> {
   await expect(page.locator('#extract-accept-all')).toBeVisible();
   await page.locator('#extract-accept-all').click();
   await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+  await expect(page.locator('#rail-facts')).toHaveAttribute('aria-selected', 'true');
 }
 
 test('knowledge map canvas interactions produce a screenshot gallery', async ({ page }) => {
@@ -58,6 +59,8 @@ test('knowledge map canvas interactions produce a screenshot gallery', async ({ 
   await page.locator('#tab-inspect').click();
   await expect(page.locator('#overview-heading')).toHaveText('Inspect');
   await expect(page.locator('#graph-empty')).toBeVisible();
+  await expect(page.locator('#graph-empty-extract')).toBeVisible();
+  await expect(page.locator('#graph-empty-extract')).toBeEnabled();
   await canvasShot(page, '007-graph-empty.png');
 
   await extractAndAccept(page);

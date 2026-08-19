@@ -186,6 +186,7 @@ async function extractAndAccept(page: Page): Promise<void> {
   await expect(page.locator('#extract-accept-all')).toBeVisible();
   await page.locator('#extract-accept-all').click();
   await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+  await expect(page.locator('#rail-facts')).toHaveAttribute('aria-selected', 'true');
 }
 
 test.describe.configure({ mode: 'serial' });

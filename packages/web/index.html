@@ -99,31 +99,45 @@
           <section id="panel-capture" class="panel" role="tabpanel" aria-labelledby="tab-capture">
             <div class="split">
               <div class="stack">
-                <article class="card">
+                <article class="card composer">
                   <h2 id="remember-heading">Remember</h2>
                   <label for="remember-input">Note</label>
-                  <textarea id="remember-input" rows="4"></textarea>
+                  <textarea id="remember-input" rows="8"></textarea>
                   <div class="row">
                     <button id="remember-button" type="button">Remember</button>
+                    <button id="extract-on-map" class="secondary" type="button" hidden>
+                      Extract on map
+                    </button>
                   </div>
                   <p id="remember-status" class="status" aria-live="polite"></p>
                 </article>
-                <article class="card">
-                  <h2 id="ingestion-heading">Ingest</h2>
-                  <label for="ingest-markdown">Markdown</label>
-                  <textarea id="ingest-markdown" rows="5"></textarea>
-                  <div class="row">
-                    <button id="ingest-button" type="button">Ingest markdown</button>
-                  </div>
-                  <label for="ingest-url">URL</label>
-                  <div class="row">
-                    <input
-                      id="ingest-url"
-                      type="url"
-                      placeholder="https://example.com/doc.md"
-                      autocomplete="off"
-                    />
-                    <button id="ingest-url-button" type="button">Ingest URL</button>
+                <article class="card ingest-card">
+                  <h2 id="ingestion-heading" class="sr-only">Ingest</h2>
+                  <button
+                    id="ingest-toggle"
+                    class="disclosure ingest-toggle"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="ingest-form"
+                  >
+                    Ingest a document
+                  </button>
+                  <div id="ingest-form" hidden>
+                    <label for="ingest-markdown">Markdown</label>
+                    <textarea id="ingest-markdown" rows="5"></textarea>
+                    <div class="row">
+                      <button id="ingest-button" type="button">Ingest markdown</button>
+                    </div>
+                    <label for="ingest-url">URL</label>
+                    <div class="row">
+                      <input
+                        id="ingest-url"
+                        type="url"
+                        placeholder="https://example.com/doc.md"
+                        autocomplete="off"
+                      />
+                      <button id="ingest-url-button" type="button">Ingest URL</button>
+                    </div>
                   </div>
                   <p id="ingestion-status" class="status" aria-live="polite"></p>
                 </article>
@@ -218,6 +232,7 @@
                   <p class="empty-state-copy">
                     Extract facts from captured notes to see nodes and edges.
                   </p>
+                  <button id="graph-empty-extract" type="button">Extract facts</button>
                 </div>
               </div>
               <p id="graph-caption" class="meta"></p>
@@ -225,7 +240,64 @@
               <p id="graph-status" class="status" aria-live="polite"></p>
             </article>
             <div class="inspect-rail">
-              <article class="card">
+              <div
+                id="inspect-rail-tabs"
+                class="rail-tabs"
+                role="tablist"
+                aria-label="Inspect details"
+              >
+                <button
+                  id="rail-dossier"
+                  type="button"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="rail-panel-dossier"
+                  data-rail="dossier"
+                  tabindex="0"
+                >
+                  Dossier
+                </button>
+                <button
+                  id="rail-extract"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="rail-panel-extract"
+                  data-rail="extract"
+                  tabindex="-1"
+                >
+                  Extract
+                </button>
+                <button
+                  id="rail-facts"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="rail-panel-facts"
+                  data-rail="facts"
+                  tabindex="-1"
+                >
+                  Facts
+                </button>
+                <button
+                  id="rail-episodes"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="rail-panel-episodes"
+                  data-rail="episodes"
+                  tabindex="-1"
+                >
+                  Episodes
+                </button>
+              </div>
+              <p id="inspect-status" class="status" aria-live="polite"></p>
+              <article
+                id="rail-panel-dossier"
+                class="card"
+                role="tabpanel"
+                aria-labelledby="rail-dossier"
+              >
                 <p class="eyebrow">Dossier</p>
                 <h2>Selected episode</h2>
                 <p class="meta">
@@ -240,9 +312,14 @@
                   <button id="retract-button" class="secondary" type="button">Retract facts</button>
                   <button id="purge-button" class="danger" type="button">Purge note</button>
                 </div>
-                <p id="inspect-status" class="status" aria-live="polite"></p>
               </article>
-              <article class="card" id="extract-review-card">
+              <article
+                id="rail-panel-extract"
+                class="card"
+                role="tabpanel"
+                aria-labelledby="rail-extract"
+                hidden
+              >
                 <p class="eyebrow">Extract</p>
                 <h2>Proposed facts</h2>
                 <p class="meta">
@@ -255,12 +332,24 @@
                   <button id="extract-skip" class="secondary" type="button" hidden>Skip</button>
                 </div>
               </article>
-              <article class="card">
+              <article
+                id="rail-panel-facts"
+                class="card"
+                role="tabpanel"
+                aria-labelledby="rail-facts"
+                hidden
+              >
                 <p class="eyebrow">Map</p>
                 <h2>Facts on the map</h2>
                 <ul id="graph-list" class="data-list" aria-label="Graph facts"></ul>
               </article>
-              <article class="card">
+              <article
+                id="rail-panel-episodes"
+                class="card"
+                role="tabpanel"
+                aria-labelledby="rail-episodes"
+                hidden
+              >
                 <h2 id="timeline-heading">Episodes</h2>
                 <ul id="timeline-list" class="data-list" aria-label="Timeline episodes"></ul>
                 <p id="timeline-status" class="status" aria-live="polite"></p>

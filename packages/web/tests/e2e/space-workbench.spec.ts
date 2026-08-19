@@ -36,6 +36,8 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
   await page.locator('#remember-input').fill(REMEMBER_CONTENT);
   await page.locator('#remember-button').click();
   await expect(page.locator('#remember-status')).toHaveText(/^Saved$/u);
+  await expect(page.locator('#extract-on-map')).toBeVisible();
+  await expect(page.locator('#extract-on-map')).toHaveText(/^Extract on map$/u);
   await expect(page.locator('#memory-list')).toContainText(DANA_OR_CAFE);
   await expect(page.locator('#memory-list')).not.toHaveText(ISO_INSTANT);
   await expect(page.locator('#memory-list')).not.toHaveText(TECHNICAL_ID);
@@ -59,6 +61,10 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
 
   await page.locator('#tab-capture').click();
   await expect(page.locator('#overview-heading')).toHaveText('Capture');
+  await expect(page.locator('#extract-on-map')).toBeVisible();
+  await expect(page.locator('#extract-on-map')).not.toHaveText(/ep_/u);
+  await page.locator('#ingest-toggle').click();
+  await expect(page.locator('#ingest-form')).toBeVisible();
   await page.locator('#ingest-markdown').fill(MARKDOWN_NOTE);
   await page.locator('#ingest-button').click();
   await expect(page.locator('#ingestion-status')).toContainText(
@@ -99,6 +105,7 @@ test('space workbench capture, recall receipts, and inspect', async ({ page }) =
     .click();
   await page.locator('#extract-accept-all').click();
   await expect(page.locator('#inspect-status')).toContainText(/Extracted/iu);
+  await expect(page.locator('#rail-facts')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#graph-list')).not.toContainText(/Dana/iu);
   await expect(page.locator('#inspect-dossier')).not.toHaveText(TECHNICAL_ID);
   await expect(page.locator('#graph-list')).not.toHaveText(/livesIn|ent_/u);

@@ -1,0 +1,23 @@
+import { describe, expect, it } from 'vitest';
+
+import { resolveServerDataDir } from './data-dir.js';
+import { parseMcpProfiles } from './mcp/profiles.js';
+
+import { defaultListenHost, defaultListenPort } from './index.js';
+
+describe('server helpers', () => {
+  it('resolves data dir, default listen, and mcp profiles', () => {
+    expect(resolveServerDataDir().length).toBeGreaterThan(0);
+    expect(defaultListenHost()).toMatch(/127|localhost/u);
+    expect(defaultListenPort()).toBeGreaterThan(0);
+    expect(parseMcpProfiles(undefined)).toContain('memory-read');
+    expect(parseMcpProfiles(undefined)).toContain('knowledge-admin');
+    expect(() => parseMcpProfiles('knowledge-read')).toThrow(/implemented tools/u);
+    expect(() => parseMcpProfiles('knowledge-read,not-a-profile')).toThrow(/implemented tools/u);
+    expect(parseMcpProfiles('knowledge-admin')).toEqual(['knowledge-admin']);
+    expect(parseMcpProfiles('memory-read,knowledge-read')).toEqual([
+      'memory-read',
+      'knowledge-read',
+    ]);
+  });
+});

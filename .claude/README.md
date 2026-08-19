@@ -16,6 +16,7 @@ This directory contains the Claude Code compatibility configuration for AI-assis
 │   ├── build-and-fix/
 │   ├── check-directory-structure/
 │   ├── codeql-fix/
+│   ├── dogfood-web/
 │   ├── improve-claude-config/
 │   ├── initialize-project/
 │   ├── lint-and-fix/
@@ -42,6 +43,7 @@ Invoke skills with slash commands:
 /setup-dev-env
 /lint-and-fix
 /test-and-fix
+/dogfood-web
 ```
 
 ### Using Agents

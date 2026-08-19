@@ -17,6 +17,10 @@ runtimes:
     - python@3.14.4
 # This is the section where you manage your linters. (https://docs.trunk.io/check/configuration)
 lint:
+  definitions:
+    - name: stylelint
+      extra_packages:
+        - stylelint-config-standard@40.0.0
   disabled:
     - checkov
     - trufflehog

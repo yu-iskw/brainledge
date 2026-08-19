@@ -1,9 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreBinaries": ["grype"],
+  "ignore": [".trunk/**"],
   "workspaces": {
     ".": {
-      "entry": ["stylelint.config.mjs"],
+      "entry": ["stylelint.config.mjs", "vitest.workspace-aliases.ts"],
       "project": ["**/*.{js,cjs,mjs,ts,cts,mts}", "!packages/**", "!.trunk/**", "!node_modules/**"]
     },
     "packages/*": {

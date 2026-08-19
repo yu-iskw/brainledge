@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brainledge</title>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="shelf" aria-label="Space shelf">
+        <p class="wordmark">
+          Brainledge
+          <small>Space workbench</small>
+        </p>
+        <div>
+          <label for="space-select">Space</label>
+          <select id="space-select" aria-label="Selected space"></select>
+        </div>
+        <button
+          id="new-space-toggle"
+          class="disclosure"
+          type="button"
+          aria-expanded="false"
+          aria-controls="spaces-create-form"
+        >
+          New space
+        </button>
+        <form id="spaces-create-form" hidden>
+          <label for="space-name-input">Name</label>
+          <div class="row">
+            <input id="space-name-input" name="name" type="text" required autocomplete="off" />
+            <button id="space-create-button" type="submit">Create</button>
+          </div>
+        </form>
+        <p id="spaces-status" class="status" aria-live="polite"></p>
+        <div class="counts">
+          <div>
+            <span class="meta">Episodes</span>
+            <strong id="overview-episode-count">—</strong>
+          </div>
+          <div>
+            <span class="meta">Facts</span>
+            <strong id="overview-fact-count">—</strong>
+          </div>
+        </div>
+        <p class="meta" id="overview-principal">This device</p>
+      </aside>
+
+      <div class="work">
+        <header class="chrome">
+          <div class="chrome-identity">
+            <span id="space-initial" class="space-badge" aria-hidden="true">B</span>
+            <div>
+              <h1 id="overview-heading">Capture</h1>
+              <p class="chrome-space" id="overview-space">Loading space…</p>
+            </div>
+          </div>
+          <p id="overview-status" class="status" aria-live="polite">Loading memories…</p>
+          <div id="global-error" class="error-banner" role="alert" aria-live="polite"></div>
+        </header>
+
+        <div id="workbench-tabs" class="tablist" role="tablist" aria-label="Workbench modes">
+          <button
+            id="tab-capture"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="panel-capture"
+            data-mode="capture"
+            tabindex="0"
+          >
+            Capture
+          </button>
+          <button
+            id="tab-recall"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-recall"
+            data-mode="recall"
+            tabindex="-1"
+          >
+            Recall
+          </button>
+          <button
+            id="tab-inspect"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-inspect"
+            data-mode="inspect"
+            tabindex="-1"
+          >
+            Inspect
+          </button>
+        </div>
+
+        <main>
+          <section id="panel-capture" class="panel" role="tabpanel" aria-labelledby="tab-capture">
+            <div class="split">
+              <div class="stack">
+                <article class="card">
+                  <h2 id="remember-heading">Remember</h2>
+                  <label for="remember-input">Note</label>
+                  <textarea id="remember-input" rows="4"></textarea>
+                  <div class="row">
+                    <button id="remember-button" type="button">Remember</button>
+                  </div>
+                  <p id="remember-status" class="status" aria-live="polite"></p>
+                </article>
+                <article class="card">
+                  <h2 id="ingestion-heading">Ingest</h2>
+                  <label for="ingest-markdown">Markdown</label>
+                  <textarea id="ingest-markdown" rows="5"></textarea>
+                  <div class="row">
+                    <button id="ingest-button" type="button">Ingest markdown</button>
+                  </div>
+                  <label for="ingest-url">URL</label>
+                  <div class="row">
+                    <input
+                      id="ingest-url"
+                      type="url"
+                      placeholder="https://example.com/doc.md"
+                      autocomplete="off"
+                    />
+                    <button id="ingest-url-button" type="button">Ingest URL</button>
+                  </div>
+                  <p id="ingestion-status" class="status" aria-live="polite"></p>
+                </article>
+              </div>
+              <article class="card">
+                <h2 id="memories-heading">Memory stream</h2>
+                <p class="meta">Notes and documents captured in this space.</p>
+                <ul id="memory-list" class="data-list" aria-label="Recent memories"></ul>
+                <p id="memories-status" class="status" aria-live="polite"></p>
+              </article>
+            </div>
+          </section>
+
+          <section
+            id="panel-recall"
+            class="panel"
+            role="tabpanel"
+            aria-labelledby="tab-recall"
+            hidden
+          >
+            <article class="card">
+              <h2 id="recall-heading">Ask</h2>
+              <label for="recall-input">Question</label>
+              <div class="row">
+                <input id="recall-input" type="search" autocomplete="off" />
+                <button id="recall-button" type="button">Recall</button>
+              </div>
+              <p id="recall-output" class="recall-answer" aria-live="polite"></p>
+            </article>
+            <div class="split recall-body">
+              <article class="card">
+                <p class="eyebrow">Memories</p>
+                <h3>Matching notes</h3>
+                <p class="meta">Episodes that answered the question.</p>
+                <ul id="recall-memories" class="data-list" aria-label="Matching memories"></ul>
+              </article>
+              <article class="card">
+                <p class="eyebrow">Receipts</p>
+                <h3>Matching facts</h3>
+                <p class="meta">Facts that answered your question, with source notes.</p>
+                <ul id="recall-receipts" class="data-list" aria-label="Matching facts"></ul>
+                <ul id="provenance-list" class="data-list" aria-label="Provenance items"></ul>
+                <p id="provenance-status" class="status" aria-live="polite"></p>
+              </article>
+            </div>
+          </section>
+
+          <section
+            id="panel-inspect"
+            class="panel inspect-layout"
+            role="tabpanel"
+            aria-labelledby="tab-inspect"
+            hidden
+          >
+            <article class="card graph-stage">
+              <p class="eyebrow">Graph</p>
+              <h2 id="graph-heading">Knowledge map</h2>
+              <p class="meta">
+                People and places are nodes. Labeled edges are facts. Drag to pan, scroll to zoom,
+                click a node or edge to inspect.
+              </p>
+              <div class="graph-toolbar">
+                <button id="graph-zoom-out" class="secondary" type="button">Zoom out</button>
+                <button id="graph-zoom-in" class="secondary" type="button">Zoom in</button>
+                <button id="graph-fit" class="secondary" type="button">Fit</button>
+                <label class="graph-as-of" for="as-of-input"
+                  >As of
+                  <input id="as-of-input" type="date" />
+                </label>
+                <label class="graph-search" for="graph-search"
+                  >Find
+                  <input
+                    id="graph-search"
+                    type="search"
+                    placeholder="Alice, Tokyo…"
+                    autocomplete="off"
+                  />
+                </label>
+              </div>
+              <ul class="graph-legend" aria-label="Map legend">
+                <li><span class="legend-swatch legend-entity"></span>People</li>
+                <li><span class="legend-swatch legend-literal"></span>Places and things</li>
+                <li>
+                  <span class="legend-swatch legend-edge"></span>
+                  <span id="graph-legend-facts">Facts</span>
+                </li>
+              </ul>
+              <div class="graph-frame">
+                <canvas id="knowledge-graph" aria-label="Knowledge graph"></canvas>
+                <div id="graph-empty" class="empty-state" hidden>
+                  <p class="empty-state-title">No graph yet</p>
+                  <p class="empty-state-copy">
+                    Extract facts from captured notes to see nodes and edges.
+                  </p>
+                </div>
+              </div>
+              <p id="graph-caption" class="meta"></p>
+              <aside id="graph-inspector" class="graph-inspector" hidden></aside>
+              <p id="graph-status" class="status" aria-live="polite"></p>
+            </article>
+            <div class="inspect-rail">
+              <article class="card">
+                <p class="eyebrow">Dossier</p>
+                <h2>Selected episode</h2>
+                <p class="meta">
+                  World time on the map filters facts. Asserted time is when we captured the note.
+                </p>
+                <div id="inspect-dossier" class="dossier"></div>
+                <div class="row">
+                  <button id="consolidate-button" type="button">Extract facts</button>
+                  <button id="forget-button" type="button">Hide note</button>
+                </div>
+                <div class="row">
+                  <button id="retract-button" class="secondary" type="button">Retract facts</button>
+                  <button id="purge-button" class="danger" type="button">Purge note</button>
+                </div>
+                <p id="inspect-status" class="status" aria-live="polite"></p>
+              </article>
+              <article class="card" id="extract-review-card">
+                <p class="eyebrow">Extract</p>
+                <h2>Proposed facts</h2>
+                <p class="meta">
+                  Review extracted triples before they become the map. Re-extract with nothing new
+                  is success.
+                </p>
+                <ul id="extract-proposed" class="data-list" aria-label="Proposed facts"></ul>
+                <div class="row">
+                  <button id="extract-accept-all" type="button" hidden>Accept all</button>
+                  <button id="extract-skip" class="secondary" type="button" hidden>Skip</button>
+                </div>
+              </article>
+              <article class="card">
+                <p class="eyebrow">Map</p>
+                <h2>Facts on the map</h2>
+                <ul id="graph-list" class="data-list" aria-label="Graph facts"></ul>
+              </article>
+              <article class="card">
+                <h2 id="timeline-heading">Episodes</h2>
+                <ul id="timeline-list" class="data-list" aria-label="Timeline episodes"></ul>
+                <p id="timeline-status" class="status" aria-live="polite"></p>
+              </article>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

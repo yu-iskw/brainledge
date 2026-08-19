@@ -1,0 +1,7 @@
+docs/threat-model.md
+node_modules
+packages/*/dist
+packages/*/coverage
+.coverage
+*.sqlite
+.brainledge

@@ -18,6 +18,18 @@ const tsParserOptions = {
 const securityRecommended = security.configs.recommended;
 
 /**
+ * eslint-plugin-security recommended plus overrides for Node CLI/storage.
+ * `detect-non-literal-fs-filename` and `detect-object-injection` flag ordinary
+ * path arguments and Map/object lookups as medium; Trunk fails PRs on new mediums.
+ * Supply-chain scanning stays in Trivy/OSV (`pnpm lint:security`).
+ */
+const securityRules = {
+  ...securityRecommended.rules,
+  'security/detect-non-literal-fs-filename': 'off',
+  'security/detect-object-injection': 'off',
+};
+
+/**
  * import-x recommended + typescript resolver (uses `projectService` from parser; eslint-import-resolver-typescript installed for resolution).
  * Prettier stays canonical via Trunk — no @stylistic rules here.
  */
@@ -78,13 +90,13 @@ const sharedTsRules = Object.assign({}, tseslint.configs['recommended-type-check
   'no-implied-eval': 'error',
   'no-new-func': 'error',
   'prefer-const': 'error',
-  'max-lines-per-function': ['error', { max: 280 }],
-  'max-depth': ['error', { max: 6 }],
-  'max-params': ['error', { max: 8 }],
-  'max-nested-callbacks': ['error', { max: 4 }],
+  'max-lines-per-function': ['error', { max: 250 }],
+  'max-depth': ['error', { max: 5 }],
+  'max-params': ['error', { max: 5 }],
+  'max-nested-callbacks': ['error', { max: 3 }],
   // SonarJS
-  'sonarjs/cyclomatic-complexity': ['error', { threshold: 20 }],
-  'sonarjs/cognitive-complexity': ['error', 20],
+  'sonarjs/cyclomatic-complexity': ['error', { threshold: 12 }],
+  'sonarjs/cognitive-complexity': ['error', 12],
   'sonarjs/no-duplicate-string': 'error',
   'sonarjs/prefer-immediate-return': 'error',
   'no-unreachable': 'error',
@@ -111,10 +123,12 @@ export default [
       '.serena/**',
       '.trunk/**',
       '**/*.generated.ts',
+      '**/playwright-report/**',
+      '**/test-results/**',
     ],
   },
   {
-    files: ['packages/**/*.config.ts'],
+    files: ['packages/**/*.config.ts', 'vitest.workspace-aliases.ts'],
     ignores: ['**/dist/**'],
     languageOptions: {
       parser: tsparser,
@@ -131,7 +145,7 @@ export default [
     settings: importXSettings,
     rules: {
       ...importXRules,
-      ...securityRecommended.rules,
+      ...securityRules,
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-new-func': 'error',
@@ -142,7 +156,7 @@ export default [
   },
   {
     files: ['packages/**/*.ts', 'packages/**/*.tsx'],
-    ignores: ['**/dist/**', '**/*.config.ts', '**/*.test.ts', '**/*.test.tsx'],
+    ignores: ['**/dist/**', '**/*.config.ts', '**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -160,9 +174,36 @@ export default [
     settings: importXSettings,
     rules: {
       ...importXRules,
-      ...securityRecommended.rules,
+      ...securityRules,
       ...sharedTsRules,
       '@typescript-eslint/no-unused-private-class-members': 'error',
+      'unicorn/filename-case': unicornFilenameCase,
+    },
+  },
+  {
+    files: ['packages/**/*.spec.ts'],
+    ignores: ['**/dist/**'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ...tsParserOptions,
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    plugins: {
+      ...importXPlugins,
+      ...securityRecommended.plugins,
+      '@typescript-eslint': tseslint,
+      sonarjs,
+      unicorn,
+    },
+    settings: importXSettings,
+    rules: {
+      ...importXRules,
+      ...securityRules,
+      ...sharedTsRules,
+      'sonarjs/no-duplicate-string': 'off',
+      'max-lines-per-function': ['error', { max: 700 }],
       'unicorn/filename-case': unicornFilenameCase,
     },
   },
@@ -188,7 +229,7 @@ export default [
     settings: importXSettings,
     rules: {
       ...importXRules,
-      ...securityRecommended.rules,
+      ...securityRules,
       ...sharedTsRules,
       ...vitestPlugin.configs.recommended.rules,
       // Tests often repeat string literals and use conditional expects; keep signal without noise.
@@ -219,7 +260,7 @@ export default [
       ...securityRecommended.plugins,
     },
     rules: {
-      ...securityRecommended.rules,
+      ...securityRules,
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },

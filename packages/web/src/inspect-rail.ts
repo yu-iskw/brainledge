@@ -1,6 +1,6 @@
 const INSPECT_RAIL_PANES = ['dossier', 'extract', 'facts', 'episodes'] as const;
 
-export type InspectRailPane = (typeof INSPECT_RAIL_PANES)[number];
+type InspectRailPane = (typeof INSPECT_RAIL_PANES)[number];
 
 export function isInspectRailPane(value: string): value is InspectRailPane {
   return (INSPECT_RAIL_PANES as readonly string[]).includes(value);

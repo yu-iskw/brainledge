@@ -28,7 +28,7 @@
     "@brainledge/storage": "workspace:*",
     "@hono/node-server": "^1.19.9",
     "@modelcontextprotocol/server": "2.0.0",
-    "hono": "^4.9.8",
+    "hono": "^4.13.5",
     "undici": "^8.10.0",
     "zod": "^4.2.0"
   },
